@@ -311,13 +311,16 @@ The published list and the demo template are both validated against the real DVB
 schemas by the provider's own conformance test:
 
 ```bash
-cd ~/Repos/DVB-I/rt-dvb-i-application-provider && npm run test:xsd
+cd ~/Repos/DVB-I/rt-dvb-i-application-provider
+DVBI_SCHEMAS=~/.local/share/dvb-i-schemas/etsi npm run test:xsd
 ```
 
-That test is bring-your-own-schema: it skips cleanly unless you have placed the schema closure in
-its gitignored `test/schemas/` directory. See the header of `test/xsd-validate.js` for the file
-list. With the schemas present it validates the sample list, the live `config.json`, every file in
-`templates/`, and both EPG endpoints.
+That test is bring-your-own-schema and skips cleanly without one, so no schema file is ever carried
+in these repositories. The authoritative copies ship with the specification itself, in the
+electronic attachment archive that accompanies ETSI TS 103 770 (annex B lists its contents); keep
+them somewhere outside every working tree, as above. With them present the test validates the
+sample list, the live `config.json`, every file in `templates/`, and both EPG endpoints, and prints
+which schema files it used.
 
 The generator targets **ETSI TS 103 770 V1.2.1 (2024-09)**, which is the issue matching the
 namespaces it emits (`urn:dvb:metadata:servicediscovery:2024`, `urn:dvb:metadata:servicediscovery-types:2023`,
