@@ -1,0 +1,157 @@
+{
+  "_comment": [
+    "The channel line-up this demo publishes. Both the encoders and the DVB-I service list are",
+    "generated from this one file, so an encoder and the service list cannot disagree about which",
+    "presentation a channel means. The loadable list template is generated from it too.",
+    "",
+    "Per channel:",
+    "  source       file under CONTENT_ROOT (env.sh) that the looping live encoder plays",
+    "  stream       directory the encoder writes under the media origin's public/ directory, and",
+    "               therefore the path the DVB-I StreamingInstance points at",
+    "  logo         file under CONTENT_ROOT, installed into the provider's public/logos/uploaded/",
+    "  letters      fallback used by the provider's generated SVG logo when no logo file is present",
+    "  type         DVB-I service type: linear (TV) or radio (linear radio)",
+    "  languages    extra language tags the service name is offered in; English is added",
+    "               automatically from name. A tag on its own reuses the channel's name, which is",
+    "               what you want unless the name genuinely differs per language: ServiceName in",
+    "               the published list is built from these entries, so one carrying a stale name",
+    "               overrides the channel's own name and a rename appears not to take effect. Give",
+    "               an entry its own \"name\" only for a real translation.",
+    "  audioDescription / hardOfHearing / subtitleLanguage",
+    "               accessibility signalling on the delivery instance",
+    "  programmes   the content guide. The provider loops these to fill the schedule window, so",
+    "               the durations decide the shape of the EPG rather than any wall-clock time.",
+    "               Each carries title, dur (minutes), desc, and optionally genre, parentalAge,",
+    "               series (title/number/episode) and catchup (a catch-up URL).",
+    "",
+    "subscriptionPackage is deliberately not set on any channel here: a service carrying one is",
+    "gated in the receiver and needs the viewer to clear a subscription prompt before it plays,",
+    "which is not what a demo wants. The reference service template shows that field instead."
+  ],
+  "channels": [
+    {
+      "id": "mwc-tv-1",
+      "name": "5G-MAG.tv 1",
+      "lcn": 1,
+      "type": "linear",
+      "genre": "entertainment",
+      "parentalRating": 0,
+      "source": "TV_1.mp4",
+      "stream": "tv_1_live",
+      "logo": "TV_1.png",
+      "logoBg": "#0a6ebd",
+      "letters": "TV1",
+      "languages": [{ "lang": "fr" }, { "lang": "de" }],
+      "audioDescription": true,
+      "hardOfHearing": true,
+      "subtitleLanguage": "en",
+      "programmes": [
+        {
+          "title": "Media over 5G",
+          "dur": 30,
+          "desc": "How broadcast and broadband delivery meet in a single 5G network, and what that changes for a public service broadcaster.",
+          "genre": "documentary",
+          "parentalAge": 0,
+          "series": { "title": "Media over 5G", "number": 1, "episode": 1 }
+        },
+        {
+          "title": "Inside the Reference Tools",
+          "dur": 45,
+          "desc": "A walk through the open source implementations behind the demos: what each component does and where the standards fit.",
+          "genre": "factual",
+          "parentalAge": 0,
+          "series": { "title": "Media over 5G", "number": 1, "episode": 2 }
+        },
+        {
+          "title": "Showcase Highlights",
+          "dur": 15,
+          "desc": "The shortest tour of the stand: multicast delivery, DVB-I service discovery and a live encoder, end to end.",
+          "genre": "entertainment",
+          "parentalAge": 0
+        }
+      ]
+    },
+    {
+      "id": "mwc-tv-2",
+      "name": "5G-MAG.tv 2",
+      "lcn": 2,
+      "type": "linear",
+      "genre": "documentary",
+      "parentalRating": 12,
+      "source": "TV_2.mp4",
+      "stream": "tv_2_live",
+      "logo": "TV_2.png",
+      "logoBg": "#0e8f6f",
+      "letters": "TV2",
+      "languages": [{ "lang": "fr" }, { "lang": "es" }],
+      "audioDescription": false,
+      "hardOfHearing": true,
+      "subtitleLanguage": "en",
+      "programmes": [
+        {
+          "title": "Standards at Work",
+          "dur": 60,
+          "desc": "Where a specification stops and an implementation starts, told through one feature carried from clause to code.",
+          "genre": "documentary",
+          "parentalAge": 12,
+          "series": { "title": "Standards at Work", "number": 2, "episode": 3 }
+        },
+        {
+          "title": "Field Report",
+          "dur": 30,
+          "desc": "Trials and deployments from members, and what did not go to plan.",
+          "genre": "news",
+          "parentalAge": 12
+        },
+        {
+          "title": "Late Feature: The Long Signal",
+          "dur": 90,
+          "desc": "An evening feature on the century of engineering that made live pictures ordinary.",
+          "genre": "film",
+          "parentalAge": 12
+        }
+      ]
+    },
+    {
+      "id": "mwc-radio",
+      "name": "5G-MAG.radio",
+      "lcn": 3,
+      "type": "radio",
+      "genre": "music",
+      "parentalRating": 0,
+      "source": "RADIO.mp4",
+      "stream": "radio_live",
+      "logo": "RADIO.png",
+      "logoBg": "#b3541e",
+      "letters": "RAD",
+      "languages": [{ "lang": "fr" }],
+      "audioDescription": false,
+      "hardOfHearing": false,
+      "subtitleLanguage": "en",
+      "programmes": [
+        {
+          "title": "Morning Sequence",
+          "dur": 120,
+          "desc": "Music and conversation to open the day.",
+          "genre": "music",
+          "parentalAge": 0
+        },
+        {
+          "title": "The Session",
+          "dur": 60,
+          "desc": "One artist, one room, no overdubs.",
+          "genre": "music",
+          "parentalAge": 0,
+          "series": { "title": "The Session", "number": 4, "episode": 7 }
+        },
+        {
+          "title": "Night Programme",
+          "dur": 180,
+          "desc": "Longer pieces and quieter listening through the night.",
+          "genre": "music",
+          "parentalAge": 0
+        }
+      ]
+    }
+  ]
+}

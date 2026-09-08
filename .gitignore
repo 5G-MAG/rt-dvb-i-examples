@@ -1,0 +1,11 @@
+# Per-run state: logs and pidfiles
+scripts/*/run/logs/
+scripts/*/run/pids/
+
+# Per-machine safety copy of the provider's service list, taken by start-all.sh before the demo
+# first replaces it. Machine state, not something to version: a fresh clone has nothing to restore
+# yet, and start-all.sh writes it on first run.
+backups/
+
+node_modules/
+*.log
