@@ -312,8 +312,13 @@ schemas by the provider's own conformance test:
 
 ```bash
 cd ~/Repos/DVB-I/rt-dvb-i-application-provider
-DVBI_SCHEMAS=~/.local/share/dvb-i-schemas/etsi npm run test:xsd
+DVBI_SCHEMAS=~/.local/share/dvb-i-schemas/etsi npm test
 ```
+
+That runs three checks: unit tests, XSD validation, and classification scheme membership. The last
+one matters because CS references are typed `anyURI`, so a schema-valid list can still name a term
+that does not exist; it checks each emitted term against the scheme files, which ship in the same
+archive as the schemas.
 
 That test is bring-your-own-schema and skips cleanly without one, so no schema file is ever carried
 in these repositories. The authoritative copies ship with the specification itself, in the
