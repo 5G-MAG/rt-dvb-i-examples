@@ -49,9 +49,27 @@ The same content can be carried either way, and running both shows the differenc
   (paths are set in each example's `env.sh`)
 - your own media files to broadcast
 
+## Checking citations
+
+Comments across these repositories cite clauses of the DVB-I specification and of its
+implementation guidelines. Both documents number clauses in the same ranges, so a citation naming
+no document is resolved by a reader against whichever they assume, and that has produced real
+errors: comments citing implementation guidance for behaviour the specification governs, and
+clauses that turned out to cover something else.
+
+```bash
+DVBI_SPECS=~/.local/share/dvb-i-specs tools/verify-citations.py
+```
+
+It checks that every citation names its document and that the clause exists there. Supply the two
+documents yourself as plain text, outside every working tree: no specification text is carried in
+these repositories. Without them the check skips. It cannot tell you whether a clause says what a
+comment claims; only reading does that.
+
 ## Layout
 
 ```
 scripts/dvbi-live-demo/   the live demo: channel line-up, start/stop/status, service list generator
+tools/                    the citation checker
 backups/                  the provider's service list as it was before an example first replaced it
 ```

@@ -36,6 +36,13 @@ jobs:
             bash -n "$f" && echo "ok $f"
           done
 
+      # Citation check. The specification text it needs is not carried in any of these
+      # repositories and cannot be, so this skips here and exits 0. It is a local check: run it
+      # with DVBI_SPECS pointing at your own extractions before changing a comment that cites a
+      # clause.
+      - name: Specification citations resolve
+        run: tools/verify-citations.py
+
       - name: channels.json is valid JSON
         working-directory: scripts/dvbi-live-demo
         run: python3 -c "import json; json.load(open('channels.json')); print('ok channels.json')"
