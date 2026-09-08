@@ -14,6 +14,12 @@ Runnable example setups for the DVB-I pair:
 Each example brings the two up against real content, so the pair can be exercised end to end
 without a broadcaster's service list or a public CDN.
 
+## Start here
+
+- **[Running the pair, end to end](docs/running-the-pair.md)** -- the two applications from a clean
+  checkout against public test streams: install, start each, publish a change and watch it reach the
+  receiver, run the test suites. Read this first if you have not run them before.
+
 ## Examples
 
 - **[DVB-I live demo](scripts/dvbi-live-demo/README.md)** -- publishes a service list of your own
