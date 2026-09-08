@@ -20,6 +20,12 @@ without a broadcaster's service list or a public CDN.
   checkout against public test streams: install, start each, publish a change and watch it reach the
   receiver, run the test suites. Read this first if you have not run them before.
 
+## Assessments
+
+- **[DVB-I over 5G](docs/dvb-i-over-5g.md)** -- what carrying these services over a 5G system would
+  require: what the standards already specify (more than expected), what is still missing from them,
+  and which of the missing pieces these repositories could supply.
+
 ## Examples
 
 - **[DVB-I live demo](scripts/dvbi-live-demo/README.md)** -- publishes a service list of your own

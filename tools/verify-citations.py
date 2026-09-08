@@ -20,6 +20,7 @@ tree:
 
     ts_103770.txt   ETSI TS 103 770, the specification
     A184r2.txt      DVB Document A184r2, the implementation guidelines
+    tr_103972.txt   ETSI TR 103 972, DVB-I over 5G deployment guidelines
 
 Produce them with `pdftotext -layout`. Without them the check skips and exits 0.
 
@@ -40,12 +41,15 @@ REPOS_ROOT = Path(__file__).resolve().parents[2]
 DOCUMENTS = {
     "TS 103 770": "ts_103770.txt",
     "A184r2": "A184r2.txt",
+    "TR 103 972": "tr_103972.txt",
 }
 # How each document may be named in a citation, longest first so the specific wins.
 LABELS = [
     ("A184r2", "A184r2"),
     ("TS 103 770", "TS 103 770"),
     ("ETSI TS 103 770", "TS 103 770"),
+    ("TR 103 972", "TR 103 972"),
+    ("ETSI TR 103 972", "TR 103 972"),
 ]
 SCAN = (".js", ".md", ".py")
 SKIP_DIRS = {"node_modules", ".git", "run", "schemas", "config-history"}
