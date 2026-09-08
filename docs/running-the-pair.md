@@ -51,7 +51,7 @@ immediately.
 
 By default there is **no authentication** (`ADMIN_TOKEN` is unset) — fine for trying this out
 locally, but don't leave it that way if the admin is reachable from anywhere else on the network
-(see § 7).
+(see section 7 of this document).
 
 ## 4. Start the client
 
