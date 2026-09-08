@@ -281,6 +281,30 @@ ends.
 `LIVE_SEG_DURATION` in `env.sh` sets the segment duration and therefore the manifest update period:
 shorter joins closer to the live edge and costs more requests.
 
+## Tests
+
+The generator has its own tests, standard library only:
+
+```bash
+cd ~/Repos/DVB-I/rt-dvb-i-examples/scripts/dvbi-live-demo
+python3 -m unittest -v test_generator
+```
+
+Every case corresponds to something that has actually gone wrong, so a failure is a defect that
+reached a running receiver once already. They cover the two version rules (a changed service moves
+forward from what was published rather than resetting, and `ServiceList@version` bumps on a real
+change but not on a no-op republish, which is what tells a receiver to re-read the list at all),
+the shape of the generated service, and the schema constraints that have bitten: a `@CGSID` that
+must be an NCName, and a `logoUrl` that must stay relative.
+
+One of them, `TestTemplateDrift`, regenerates the list template from `channels.json` and compares
+it with the copy in the provider's `templates/`. Regenerating that template is a manual step, so
+this is what notices when it starts describing a line-up that no longer exists. If it fails:
+
+```bash
+source ./env.sh && ./write-service-list.py --emit-template
+```
+
 ## Conformance
 
 The published list and the demo template are both validated against the real DVB-I and TV-Anytime

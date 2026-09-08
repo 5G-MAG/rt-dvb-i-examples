@@ -9,3 +9,6 @@ backups/
 
 node_modules/
 *.log
+
+# Python bytecode cache
+__pycache__/

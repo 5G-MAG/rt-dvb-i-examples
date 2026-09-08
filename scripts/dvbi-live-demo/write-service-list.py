@@ -174,7 +174,8 @@ def reconcile_versions(services, existing):
 
 
 def main():
-    channels = json.load(open(CHANNELS_FILE))["channels"]
+    with open(CHANNELS_FILE) as f:
+        channels = json.load(f)["channels"]
     services = [service(c) for c in channels]
 
     if EMIT_TEMPLATE:
@@ -188,7 +189,8 @@ def main():
             print(f"  LCN {s['lcn']}  {s['name']:<12} {s['instances'][0]['url']}")
         return
 
-    cfg = json.load(open(CONFIG))
+    with open(CONFIG) as f:
+        cfg = json.load(f)
     reconcile_versions(services, cfg.get("services", []))
     new_values = {
         "listName": LIST_NAME,
