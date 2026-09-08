@@ -53,11 +53,13 @@ LOG_DIR="$RUN_DIR/logs"
 PID_DIR="$RUN_DIR/pids"
 CHANNELS_FILE="${CHANNELS_FILE:-$DEMO_ROOT/channels.json}"
 
-# The DVB-I client's /proxy refuses to fetch from loopback and private addresses (its own SSRF
-# guard), which is exactly where the admin sits in this demo. ALLOW_LOOPBACK_PROXY=1 is the
-# escape hatch rt-dvb-i-application/server.js documents for local testing. It is set here because every
-# service in this demo binds loopback only. Do not carry it into a deployment reachable from
-# untrusted networks: it disables the guard outright.
-ALLOW_LOOPBACK_PROXY="${ALLOW_LOOPBACK_PROXY:-1}"
+# The receiver's /proxy refuses to fetch from loopback and private addresses (its own SSRF guard),
+# which is exactly where the provider sits in this demo. PROXY_ALLOW_ORIGINS names the origins it
+# may fetch anyway, matched exactly on scheme, host and port, leaving every other address guarded.
+#
+# Both spellings of the provider's origin are needed: the receiver loads the service list from
+# localhost:4000, while the ContentGuideSource inside that list points at 127.0.0.1:4000, and an
+# allowlist entry is an origin rather than a host.
+PROXY_ALLOW_ORIGINS="${PROXY_ALLOW_ORIGINS:-http://localhost:$ADMIN_PORT,http://127.0.0.1:$ADMIN_PORT}"
 
 set +a

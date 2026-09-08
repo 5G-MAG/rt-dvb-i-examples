@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # The generator's own tests: version handling, the generated service shape, programme
+      # mapping, and the two schema constraints that have caused real defects. Standard library
+      # only, so there is nothing to install.
+      #
+      # One case, TestTemplateDrift, compares the shipped list template with what channels.json
+      # would produce, and needs the provider checked out beside this repository. It is not, here,
+      # so that case reports as skipped rather than passing quietly: read the run's skip count. It
+      # is the one check in this file that CI cannot currently make.
+      - name: Generator tests
+        working-directory: scripts/dvbi-live-demo
+        run: python3 -m unittest -v test_generator
+
+      # The demo scripts are not exercised here: they need a media origin, ffmpeg encoders and
+      # two Node services running. Catching a syntax error in them is still worth the two seconds.
+      - name: Shell scripts parse
+        working-directory: scripts/dvbi-live-demo
+        run: |
+          for f in env.sh lib.sh start-all.sh stop-all.sh status.sh regen-service-list.sh; do
+            bash -n "$f" && echo "ok $f"
+          done
+
+      - name: channels.json is valid JSON
+        working-directory: scripts/dvbi-live-demo
+        run: python3 -c "import json; json.load(open('channels.json')); print('ok channels.json')"

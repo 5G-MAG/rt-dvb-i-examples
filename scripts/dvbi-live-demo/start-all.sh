@@ -105,9 +105,9 @@ run_bg rt-dvb-i-application-provider env PORT="$ADMIN_PORT" node "$ADMIN_DIR/ser
 wait_http "http://127.0.0.1:$ADMIN_PORT/service-list.xml" 20 || die "the admin did not come up, see $LOG_DIR/rt-dvb-i-application-provider.log"
 
 log "=== 4/4 DVB-I client ==="
-# ALLOW_LOOPBACK_PROXY: see the note on it in env.sh. Without it the client's /proxy refuses to
-# fetch a service list from the admin, because the admin is on loopback.
-run_bg rt-dvb-i-application env PORT="$CLIENT_PORT" ALLOW_LOOPBACK_PROXY="$ALLOW_LOOPBACK_PROXY" node "$CLIENT_DIR/server.js"
+# PROXY_ALLOW_ORIGINS: see the note on it in env.sh. Without it the receiver's /proxy refuses to
+# fetch the service list, because the provider is on loopback.
+run_bg rt-dvb-i-application env PORT="$CLIENT_PORT" PROXY_ALLOW_ORIGINS="$PROXY_ALLOW_ORIGINS" node "$CLIENT_DIR/server.js"
 wait_http "http://127.0.0.1:$CLIENT_PORT/health" 20 || die "the client did not come up, see $LOG_DIR/rt-dvb-i-application.log"
 
 echo
