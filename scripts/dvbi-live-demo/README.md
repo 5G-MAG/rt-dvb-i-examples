@@ -368,6 +368,15 @@ Service Name field, so an entry still holding the old text overrides the rename 
 keeps showing the old name. Either clear those entries or update them too. In `channels.json`, a
 language entry given only a `lang` reuses the channel's `name`, which avoids the problem entirely.
 
+**The receiver's browser tests fail but nothing else does.** Chromium cannot run in some
+environments: every subresource fetch fails with `net::ERR_INSUFFICIENT_RESOURCES` and the renderer
+crashes, so the page loads and nothing renders. Run the suite on another engine instead, which is
+already installed with Playwright:
+
+```bash
+cd ~/Repos/DVB-I/rt-dvb-i-application && BROWSER=firefox npm test
+```
+
 **Port already bound.** Ports are set in `env.sh`. `./stop-all.sh` reports a foreign process holding
 one rather than killing it.
 
