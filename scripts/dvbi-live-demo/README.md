@@ -341,6 +341,22 @@ testing. Confirm with `grep ALLOW_LOOPBACK run/logs/rt-dvb-i-application.log`, w
 warning it prints when the flag is on. Never set that flag on a deployment reachable from untrusted
 networks: it disables the guard outright.
 
+**"Service list is not valid XML".** The receiver is fetching something that is not the list,
+almost always the provider's home page (`http://localhost:4000/`) rather than the list itself
+(`http://localhost:4000/service-list.xml`). That URL lives in the browser's own storage, so the
+server looks perfectly healthy while one browser fails. Fix it by opening the receiver with the URL
+in the query string, which sets and remembers it:
+
+```
+http://localhost:5000/?url=http://localhost:4000/service-list.xml
+```
+
+or clear the stored value from the browser console and reload:
+
+```js
+localStorage.removeItem('dvbi-url'); location.reload();
+```
+
 **Channels listed but no picture.** Look at the browser console. Segments are fetched straight from
 the origin rather than through the receiver's proxy; the origin sends
 `Access-Control-Allow-Origin: *` and the receiver's CSP allows `http:` media, so a failure here is
