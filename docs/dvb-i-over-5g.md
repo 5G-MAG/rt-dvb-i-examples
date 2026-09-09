@@ -81,18 +81,39 @@ current specification is Release 18, and the client APIs have since been restruc
 separate document. Most of its 5GMS gaps are closed.
 
 Checked 2026-09-09 against ETSI TS 103 770 V1.2.1, DVB A177r8 (draft V1.3.1), ETSI TS 126 512
-V18.6.0 (2025-07) and ETSI TS 126 510 V19.1.0 (2026-02). Three gaps could not be checked because
-they belong to documents not consulted here, and are marked as such rather than guessed at.
+V18.6.0 (2025-07), ETSI TS 126 510 V19.1.0 (2026-02), ETSI TS 103 720 V1.2.1 (2023-06) and ETSI
+TS 129 116 V18.0.0 (2024-05). Every gap in the report is accounted for.
 
 ### 5G Broadcast scenario, TR clause 6.2.4
 
 | # | Gap | Owner | Status |
 |---|---|---|---|
-| 1 | How `Keep updated interval` and `Periodic update interval` should be configured is unclear | TS 129 116 | **not checked** |
-| 2 | A 5G Broadcast Receiver is not required to support simultaneous reception of more than one user service | TS 103 720 | **not checked** |
-| 3 | Possible gap in the stage 3 xMB-C API for notifying the BM-SC of updates | TS 129 116 | **not checked** |
+| 1 | How `Keep updated interval` and `Periodic update interval` should be configured is unclear | TS 129 116 | **open**, unchanged |
+| 2 | A 5G Broadcast Receiver is not required to support simultaneous reception of more than one user service | TS 103 720 | **closed**, before the report |
+| 3 | Possible gap in the stage 3 xMB-C API for notifying the BM-SC of updates | TS 129 116 | **open** |
 | 4 | A service class filter for DVB-I services needs defining by DVB | DVB | **closed** |
 | 5 | A service instance cannot refer to a 5G Broadcast or MBMS URL | DVB or 3GPP | **open** |
+
+**Gap 2 was already closed when the report was published.** TS 103 720 V1.2.1 clause 7.4 says a 5G
+Broadcast Receiver should support simultaneous reception of at least four MBMS User Services on the
+same carrier with different TMGIs, and that an MBMS Client should support simultaneous reception of
+multiple services on one carrier. The report asked for exactly a recommendation and that is what the
+clause gives. The dates are the point: TS 103 720 V1.2.1 is 2023-06 and the report is 2023-07, so
+this gap was closed one month before the document naming it appeared. Its reference to TS 103 720
+carries no version, which is how that happens.
+
+**Gaps 1 and 3 are open, and nothing has moved.** TS 129 116 V18.0.0 still defines Keep Updated
+Interval as the interval at which the BM-SC checks file resources for changes, and Periodic update
+interval as the nominally expected time between successive updates of a file. Both are defined
+semantically; neither carries guidance on how to choose values or how the two interact, which is
+what the report found unclear. Its change history records only two entries after the report's
+baseline, an xMB extension for 5GMS in V17.2.0 and miscellaneous corrections in V18.0.0, neither
+touching these properties.
+
+On gap 3, the notification machinery in that API runs the other way: clause 8 specifies notification
+push from the BM-SC to the Content Provider. For the Content Provider to tell the BM-SC that content
+changed, what exists is polling through Keep Updated Interval rather than a notification. No push
+mechanism in that direction was found, which matches what the report suspected.
 
 **Gap 4 is closed.** TS 103 770 V1.2.1 clause 9.3.1 table 106 defines three service class
 identifiers, `urn:dvb:metadata:serviceClass:DVB-I_Service_List:1`, `...DVB-I_Content_Guide:1` and
@@ -152,16 +173,25 @@ call rather than a matching of text, and it should be confirmed with 3GPP before
 
 ### What this leaves
 
-Of fourteen items, six are closed, one is addressed by restructuring, one the report itself says
-needs no specification work, three are open, and three were not checked.
+Of fourteen items, seven are closed, one is addressed by restructuring, one the report itself says
+needs no specification work, and five are open.
 
-**Every open item is on the DVB side**, and they are the same shape: the service list has nowhere to
-put a 5G locator, whether for 5G Broadcast (gap 5) or for 5GMS access information (gaps 1 and 2).
-The 3GPP side of this integration has largely moved on; the DVB side has not, and its draft
-successor does not either.
+The five open ones fall into two groups.
 
-That is a useful thing to know before planning work: the missing piece is a service list extension,
-which is small, well understood, and squarely in DVB's court.
+**Three are on the DVB side, and are the same shape**: the service list has nowhere to put a 5G
+locator, whether for 5G Broadcast (clause 6.2.4 gap 5) or for 5GMS access information (clause 6.3.4
+gaps 1 and 2). This is the group that blocks anything being built here, and it is small,
+well understood, and squarely in DVB's court.
+
+**Two are xMB provisioning details** (clause 6.2.4 gaps 1 and 3): how the two update-interval
+properties should be configured, and the absence of a way for a Content Provider to notify the BM-SC
+that content has changed rather than having it poll. Neither blocks a demonstration. Both would
+matter to an operator running the provisioning chain in earnest.
+
+Worth noting how stale a gap list becomes. One item was already closed a month before the report was
+published, five more have closed since, and three of those closed in a document that did not exist
+in its current form when the report was written. A gap list is a snapshot, and this one is three
+years old.
 
 ## What these repositories already provide
 
