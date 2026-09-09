@@ -80,9 +80,15 @@ TR 103 972 was published in 2023-07 and assessed 5G Media Streaming against **Re
 current specification is Release 18, and the client APIs have since been restructured into a
 separate document. Most of its 5GMS gaps are closed.
 
-Checked 2026-09-09 against ETSI TS 103 770 V1.2.1, DVB A177r8 (draft V1.3.1), ETSI TS 126 512
-V18.6.0 (2025-07), ETSI TS 126 510 V19.1.0 (2026-02), ETSI TS 103 720 V1.2.1 (2023-06) and ETSI
-TS 129 116 V18.0.0 (2024-05). Every gap in the report is accounted for.
+Checked 2026-09-09 against the newest published issue of each document: ETSI TS 103 770 V1.2.1
+(2024-09), DVB A177r8 (draft V1.3.1), ETSI TS 103 720 V1.2.1 (2023-06), ETSI TS 129 116 V19.0.0
+(2025-10), ETSI TS 126 512 V19.3.0 (2026-08) and ETSI TS 126 510 V19.2.0 (2026-08). Every gap in the
+report is accounted for.
+
+The DVB side has published nothing newer. TS 103 770 V1.2.1, TS 103 720 V1.2.1 and the report itself
+are each still the latest issue of their document; no V1.3.1 or V1.4.1 of any of them exists on the
+ETSI deliverable server. The 3GPP-derived documents have all moved on by one or two releases since
+the versions the report assessed.
 
 ### 5G Broadcast scenario, TR clause 6.2.4
 
@@ -102,13 +108,13 @@ clause gives. The dates are the point: TS 103 720 V1.2.1 is 2023-06 and the repo
 this gap was closed one month before the document naming it appeared. Its reference to TS 103 720
 carries no version, which is how that happens.
 
-**Gaps 1 and 3 are open, and nothing has moved.** TS 129 116 V18.0.0 still defines Keep Updated
-Interval as the interval at which the BM-SC checks file resources for changes, and Periodic update
-interval as the nominally expected time between successive updates of a file. Both are defined
-semantically; neither carries guidance on how to choose values or how the two interact, which is
-what the report found unclear. Its change history records only two entries after the report's
-baseline, an xMB extension for 5GMS in V17.2.0 and miscellaneous corrections in V18.0.0, neither
-touching these properties.
+**Gaps 1 and 3 are open, and nothing has moved, through Release 19.** TS 129 116 V19.0.0 still
+defines Keep Updated Interval as the interval at which the BM-SC checks file resources for changes,
+and Periodic update interval as the nominally expected time between successive updates of a file.
+Both are defined semantically; neither carries guidance on how to choose values or how the two
+interact, which is what the report found unclear. The change history records an xMB extension for
+5GMS in V17.2.0, miscellaneous corrections in V18.0.0, and for V19.0.0 only "Update to Rel-19
+version (MCC)", a version bump carrying no technical change.
 
 On gap 3, the notification machinery in that API runs the other way: clause 8 specifies notification
 push from the BM-SC to the Content Provider. For the Content Provider to tell the BM-SC that content
@@ -141,12 +147,12 @@ contains the string "5G Broadcast", "5GMS" or "ServiceAccessInformation" anywher
 | 8 | `OPERATION_POINT_CHANGED` carries no payload; no operation point in status; no external reference | TS 126 512 | **closed** |
 | 9 | No client API to request network assistance | TS 126 512 | **closed**, relocated |
 
-**The client APIs moved.** In TS 126 512 V18.6.0 the clauses the report cites for gaps 5, 7 and 9,
+**The client APIs moved.** In TS 126 512 V19.3.0 the clauses the report cites for gaps 5, 7 and 9,
 namely 12.2.5, 12.2.6 and 12.2.7, are all marked Void, and that material now lives in TS 26.510
 (published by ETSI as TS 126 510), which 126 512 references throughout. The report's clause numbers
 for those gaps no longer locate anything: the status has to be read in the newer document.
 
-**Gaps 5 and 7 are closed** in TS 126 510 V19.1.0 clause 11.6.2. Table 11.6.2-2 lists
+**Gaps 5 and 7 are closed** in TS 126 510 V19.2.0 clause 11.6.2. Table 11.6.2-2 lists
 `METRICS_REPORTING_ACTIVATED` and `NEW_METRICS_REPORT` among the notification events the Media
 Session Handler exposes, which are the activation and submission announcements the report asked
 for, and table 11.6.2-1 adds `lastMetricsReport` status information alongside them.
@@ -154,7 +160,7 @@ for, and table 11.6.2-1 adds `lastMetricsReport` status information alongside th
 **Gap 9 is closed** by clause 11.4 of the same document, a Network Assistance client API with its
 own methods and status information, where the report found an empty clause.
 
-**Gap 6 is closed.** TS 126 512 V18.6.0 table 13.2.6-1 now carries a `state` row holding an
+**Gap 6 is closed.** TS 126 512 V19.3.0 table 13.2.6-1 now carries a `state` row holding an
 enumerated value from table 13.2.2-1 indicating the current state of the Media Player, which is
 precisely what the report proposed instead of inferring it from a non-zero playback rate.
 
@@ -166,7 +172,7 @@ wanted, for correlating an operation point with a Representation in the MPD, is 
 `externalReference` now provides.
 
 **Gap 3 is addressed, though not in the way proposed.** The report suggested an additional M7
-method. Instead, `attachMPD()` in TS 126 512 V18.6.0 clause 13.2.3.3 takes a media delivery session
+method. Instead, `attachMPD()` in TS 126 512 V19.3.0 clause 13.2.3.3 takes a media delivery session
 identifier alongside the MPD URL, so the presentation is bound to an already-initialised session
 rather than to the access information directly. Whether that satisfies the intent is a judgement
 call rather than a matching of text, and it should be confirmed with 3GPP before being relied on.
@@ -192,6 +198,10 @@ Worth noting how stale a gap list becomes. One item was already closed a month b
 published, five more have closed since, and three of those closed in a document that did not exist
 in its current form when the report was written. A gap list is a snapshot, and this one is three
 years old.
+
+The asymmetry is the other half of that observation. Every 3GPP-derived document here has advanced
+one or two releases since the report; not one of the three DVB documents has been reissued at all.
+The gaps that remain open are, with two exceptions, on the side that has not moved.
 
 ## What these repositories already provide
 
