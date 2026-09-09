@@ -74,6 +74,95 @@ assume DASH means unicast, and prefers a distinct instance type. Clause 6.4.4.4 
 same content is offered on two instances, new signalling is needed to say that the two are identical
 and time-aligned so a client may combine them.
 
+## Gap by gap: what has closed since the report
+
+TR 103 972 was published in 2023-07 and assessed 5G Media Streaming against **Release 16**. The
+current specification is Release 18, and the client APIs have since been restructured into a
+separate document. Most of its 5GMS gaps are closed.
+
+Checked 2026-09-09 against ETSI TS 103 770 V1.2.1, DVB A177r8 (draft V1.3.1), ETSI TS 126 512
+V18.6.0 (2025-07) and ETSI TS 126 510 V19.1.0 (2026-02). Three gaps could not be checked because
+they belong to documents not consulted here, and are marked as such rather than guessed at.
+
+### 5G Broadcast scenario, TR clause 6.2.4
+
+| # | Gap | Owner | Status |
+|---|---|---|---|
+| 1 | How `Keep updated interval` and `Periodic update interval` should be configured is unclear | TS 129 116 | **not checked** |
+| 2 | A 5G Broadcast Receiver is not required to support simultaneous reception of more than one user service | TS 103 720 | **not checked** |
+| 3 | Possible gap in the stage 3 xMB-C API for notifying the BM-SC of updates | TS 129 116 | **not checked** |
+| 4 | A service class filter for DVB-I services needs defining by DVB | DVB | **closed** |
+| 5 | A service instance cannot refer to a 5G Broadcast or MBMS URL | DVB or 3GPP | **open** |
+
+**Gap 4 is closed.** TS 103 770 V1.2.1 clause 9.3.1 table 106 defines three service class
+identifiers, `urn:dvb:metadata:serviceClass:DVB-I_Service_List:1`, `...DVB-I_Content_Guide:1` and
+`...DVB-I_Service_Instance:1`, and the clause requires `userServiceDescription@serviceClass` to
+carry the appropriate one. That is exactly the filter the report asked for, and it arrived in the
+issue published a year after the report.
+
+**Gap 5 is open, and stays open in the draft.** The delivery parameter choice offers eight types
+(clauses 5.5.18.1 to 5.5.18.8) plus the `OtherDeliveryParameters` extension point, none of them
+MBMS. Clause 9.3.3 nonetheless describes what a client does with "a service instance with an
+mbms:// locator", the only occurrence of that scheme in the document. Neither V1.2.1 nor A177r8
+contains the string "5G Broadcast", "5GMS" or "ServiceAccessInformation" anywhere.
+
+### 5G Media Streaming scenario, TR clause 6.3.4
+
+| # | Gap | Owner | Status |
+|---|---|---|---|
+| 1 | Service instance metadata needs 5GMS Service Access Information | DVB, or 3GPP | **open** on the DVB side |
+| 2 | Playlist entry needs the same | DVB, or 3GPP | **open** on the DVB side |
+| 3 | No means to bind the Media Player Entry URL to Service Access Information | TS 126 512 | **addressed**, differently |
+| 4 | No mechanism for implicitly launching the Media Session Handler | TS 126 512 | **not a gap**, the report says so itself |
+| 5 | No notification that QoE metrics reporting was activated | TS 126 512 | **closed**, relocated |
+| 6 | Playback state not explicitly exposed in M7 status | TS 126 512 | **closed** |
+| 7 | No notification that a metrics report was submitted | TS 126 512 | **closed**, relocated |
+| 8 | `OPERATION_POINT_CHANGED` carries no payload; no operation point in status; no external reference | TS 126 512 | **closed** |
+| 9 | No client API to request network assistance | TS 126 512 | **closed**, relocated |
+
+**The client APIs moved.** In TS 126 512 V18.6.0 the clauses the report cites for gaps 5, 7 and 9,
+namely 12.2.5, 12.2.6 and 12.2.7, are all marked Void, and that material now lives in TS 26.510
+(published by ETSI as TS 126 510), which 126 512 references throughout. The report's clause numbers
+for those gaps no longer locate anything: the status has to be read in the newer document.
+
+**Gaps 5 and 7 are closed** in TS 126 510 V19.1.0 clause 11.6.2. Table 11.6.2-2 lists
+`METRICS_REPORTING_ACTIVATED` and `NEW_METRICS_REPORT` among the notification events the Media
+Session Handler exposes, which are the activation and submission announcements the report asked
+for, and table 11.6.2-1 adds `lastMetricsReport` status information alongside them.
+
+**Gap 9 is closed** by clause 11.4 of the same document, a Network Assistance client API with its
+own methods and status information, where the report found an empty clause.
+
+**Gap 6 is closed.** TS 126 512 V18.6.0 table 13.2.6-1 now carries a `state` row holding an
+enumerated value from table 13.2.2-1 indicating the current state of the Media Player, which is
+precisely what the report proposed instead of inferring it from a non-zero playback rate.
+
+**Gap 8 is closed, both halves.** `OPERATION_POINT_CHANGED` now declares a payload of the media
+delivery session identifier together with the external reference identifier of the currently
+selected Service Operation Point, and the dynamic status information exposes
+`serviceOperationPoints` with an indication of which is current. The external reference the report
+wanted, for correlating an operation point with a Representation in the MPD, is the mechanism
+`externalReference` now provides.
+
+**Gap 3 is addressed, though not in the way proposed.** The report suggested an additional M7
+method. Instead, `attachMPD()` in TS 126 512 V18.6.0 clause 13.2.3.3 takes a media delivery session
+identifier alongside the MPD URL, so the presentation is bound to an already-initialised session
+rather than to the access information directly. Whether that satisfies the intent is a judgement
+call rather than a matching of text, and it should be confirmed with 3GPP before being relied on.
+
+### What this leaves
+
+Of fourteen items, six are closed, one is addressed by restructuring, one the report itself says
+needs no specification work, three are open, and three were not checked.
+
+**Every open item is on the DVB side**, and they are the same shape: the service list has nowhere to
+put a 5G locator, whether for 5G Broadcast (gap 5) or for 5GMS access information (gaps 1 and 2).
+The 3GPP side of this integration has largely moved on; the DVB side has not, and its draft
+successor does not either.
+
+That is a useful thing to know before planning work: the missing piece is a service list extension,
+which is small, well understood, and squarely in DVB's court.
+
 ## What these repositories already provide
 
 | Piece | Where | Relevance |

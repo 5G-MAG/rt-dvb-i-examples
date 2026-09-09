@@ -21,6 +21,8 @@ tree:
     ts_103770.txt   ETSI TS 103 770, the specification
     A184r2.txt      DVB Document A184r2, the implementation guidelines
     tr_103972.txt   ETSI TR 103 972, DVB-I over 5G deployment guidelines
+    ts_126512.txt   ETSI TS 126 512, 5G Media Streaming protocols
+    ts_126510.txt   ETSI TS 126 510, Media delivery
 
 Produce them with `pdftotext -layout`. Without them the check skips and exits 0.
 
@@ -42,6 +44,8 @@ DOCUMENTS = {
     "TS 103 770": "ts_103770.txt",
     "A184r2": "A184r2.txt",
     "TR 103 972": "tr_103972.txt",
+    "TS 126 512": "ts_126512.txt",
+    "TS 126 510": "ts_126510.txt",
 }
 # How each document may be named in a citation, longest first so the specific wins.
 LABELS = [
@@ -50,12 +54,15 @@ LABELS = [
     ("ETSI TS 103 770", "TS 103 770"),
     ("TR 103 972", "TR 103 972"),
     ("ETSI TR 103 972", "TR 103 972"),
+    ("TS 126 512", "TS 126 512"),
+    ("TS 126 510", "TS 126 510"),
 ]
 SCAN = (".js", ".md", ".py")
 SKIP_DIRS = {"node_modules", ".git", "run", "schemas", "config-history"}
 # Documents cited here that this tool holds no copy of, so cannot resolve. Naming them keeps them
 # visible rather than silently passing.
-FOREIGN = ("ISO/IEC 23009-1", "TS 102 822", "TS 102 822-3-1", "RFC")
+FOREIGN = ("ISO/IEC 23009-1", "TS 102 822", "TS 102 822-3-1", "RFC",
+           "TS 129 116", "TS 103 720", "TS 126 501", "TS 126 346", "TS 126 347")
 
 # "section" is deliberately not matched: in these repositories it refers to a heading of the
 # document doing the writing, not to a clause of a specification.
