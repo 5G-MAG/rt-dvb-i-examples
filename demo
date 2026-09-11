@@ -1,0 +1,300 @@
+#!/bin/bash
+# One entry point for the demo in this repository.
+#
+#   ./demo up          start the DVB-I demo, after checking nothing will collide with it
+#   ./demo down [--all] stop it, verify nothing is left; --all stops all three demos
+#   ./demo status      what is up
+#   ./demo doctor      run the checks only, change nothing
+#   ./demo logs [name] list or tail this demo's logs
+#
+# The scripts under scripts/dvbi-live-demo are unchanged and can still be run directly. This
+# wrapper exists so the demo can be started without knowing which directory it lives in, and so
+# that starting it does not silently fail against another demo already holding what it needs.
+#
+# The collision that matters here is the media origin. This demo runs its own copy of
+# rt-mbs-examples' express-mock-media-server on port 3004, and the MBS demo in that repository
+# binds the same port for its own origin, so the two cannot both be up. The MBMS demo uses 3005
+# and does not collide, but it is large enough to matter for memory.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+REPO_ROOT="$PWD"
+DEMO_DIR="$REPO_ROOT/scripts/dvbi-live-demo"
+
+# This demo is a media origin, two Node servers and a few encoders, so it needs far less than the
+# radio-bearing demos. No vendor figure governs the number; it is set from what this demo's own
+# processes were measured to use, with headroom. Override with DEMO_MIN_FREE_MB.
+MIN_FREE_MB="${DEMO_MIN_FREE_MB:-1500}"
+
+# What this demo owns. `down` uses these to prove it actually stopped rather than assuming the
+# stop script worked.
+SELF_PROCS=()
+SELF_PROC_PATTERNS=("rt-dvb-i-application" "express-mock-media-server")
+SELF_PORTS=(3004 4000 5000)
+SELF_NETNS="__none__"
+
+# Sibling demo checkouts, for `down --all`.
+find_sibling() {
+    local name="$1" env_override="$2"
+    [ -n "$env_override" ] && { [ -x "$env_override/demo" ] && echo "$env_override"; return; }
+    local c e
+    for c in "$REPO_ROOT/../$name" "$REPO_ROOT/../../$name" \
+             "$REPO_ROOT/../../*/$name" "$HOME/$name" "$HOME/Repos/$name"; do
+        for e in $c; do [ -x "$e/demo" ] && { realpath "$e"; return; }; done
+    done
+}
+
+c_red=$'\033[31m'; c_grn=$'\033[32m'; c_yel=$'\033[33m'; c_off=$'\033[0m'
+ok()   { echo "  ${c_grn}ok${c_off}    $*"; }
+warn() { echo "  ${c_yel}warn${c_off}  $*"; }
+bad()  { echo "  ${c_red}block${c_off} $*"; }
+
+usage() {
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    exit "${1:-0}"
+}
+
+# pgrep -f, excluding this script and the shell that launched it. Without that, a check whose
+# pattern appears in its own invocation reports a process that is not there.
+pgrep_other() {
+    pgrep -f "$1" 2>/dev/null | grep -vxF -e "$$" -e "${PPID:-0}" | head -1
+}
+
+port_held_by() {
+    ss -lntp 2>/dev/null | awk -v p=":$1\$" '$4 ~ p {print $0; exit}'
+}
+
+# ---------------------------------------------------------------- checks
+
+# Already running? Then a restart frees what it holds, so its own ports and memory use are not
+# reasons to refuse.
+SELF_RUNNING=0
+detect_self() {
+    [ -d "$DEMO_DIR/run/pids" ] && [ -n "$(ls -A "$DEMO_DIR/run/pids" 2>/dev/null)" ] \
+        && SELF_RUNNING=1 || true
+}
+
+check_prereqs() {
+    local missing=0
+    for c in node ffmpeg curl python3; do
+        command -v "$c" >/dev/null 2>&1 || { bad "missing command: $c"; missing=1; }
+    done
+    [ "$missing" -eq 0 ] && ok "required commands present"
+    return "$missing"
+}
+
+check_memory() {
+    local avail
+    avail=$(awk '/MemAvailable/ {printf "%d", $2/1024}' /proc/meminfo)
+    if [ "$avail" -lt "$MIN_FREE_MB" ] && [ "$SELF_RUNNING" -eq 1 ]; then
+        warn "only ${avail} MB available, but this demo is already running and"
+        echo "        start-all.sh stops it first, which frees what it holds"
+        return 0
+    fi
+    if [ "$avail" -lt "$MIN_FREE_MB" ]; then
+        bad "only ${avail} MB available, this demo wants at least ${MIN_FREE_MB} MB"
+        echo "        the largest consumers right now:"
+        ps -eo rss,comm --sort=-rss | awk 'NR>1 && NR<=4 {printf "          %6.0f MB  %s\n", $1/1024, $2}'
+        return 1
+    fi
+    ok "memory: ${avail} MB available"
+    return 0
+}
+
+# The media origin port, and the ports the admin and client bind.
+check_ports() {
+    local rc=0 found=0 holder proc
+    for p in 3004 4000 5000; do
+        holder=$(port_held_by "$p") || true
+        [ -z "$holder" ] && continue
+        found=1
+        if [ "$SELF_RUNNING" -eq 1 ]; then
+            warn "port $p is held by this demo from an earlier run"
+            echo "        start-all.sh stops it first, so a restart is fine"
+            continue
+        fi
+        proc=$(sed -n 's/.*users:((\"\([^"]*\)\".*/\1/p' <<<"$holder")
+        bad "port $p is already held by ${proc:-another process}"
+        if [ "$p" = 3004 ] && [ -n "$(pgrep_other "open5gs-(smfd|amfd|nrfd)")" ]; then
+            echo "        that is the MBS demo, whose media origin uses the same port"
+            echo "        stop it from your rt-mbs-examples checkout:  ./demo down"
+        else
+            echo "        $holder"
+        fi
+        rc=1
+    done
+    [ "$rc" -eq 0 ] && [ "$found" -eq 0 ] && ok "ports 3004, 4000 and 5000 are free"
+    return "$rc"
+}
+
+# The radio-bearing demos do not take our ports, but they are large.
+check_neighbours() {
+    local seen=0
+    if pgrep -x srsenb >/dev/null 2>&1 || pgrep -x bmsc >/dev/null 2>&1; then
+        warn "the MBMS demo is running and will compete for memory"; seen=1
+    fi
+    if [ -n "$(pgrep_other "open5gs-(smfd|amfd|nrfd)")" ]; then
+        warn "the MBS demo is running and will compete for memory"; seen=1
+    fi
+    [ "$seen" -eq 0 ] && ok "no other demo in the way"
+    return 0
+}
+
+doctor() {
+    detect_self
+    echo "Checks:"
+    local rc=0
+    check_prereqs    || rc=1
+    check_memory     || rc=1
+    check_ports      || rc=1
+    check_neighbours || true
+    echo
+    if [ "$rc" -eq 0 ]; then
+        echo "Ready to start."
+    else
+        echo "Not ready. Fix the blocking items above, or re-run with --force to start anyway."
+    fi
+    return "$rc"
+}
+
+# ---------------------------------------------------------------- teardown
+
+# Anything of this demo still present after a stop. Printed by `down` so a partial teardown is
+# visible rather than discovered by the next `up`.
+leftovers() {
+    local out=() p pid
+    for p in "${SELF_PROCS[@]}"; do
+        pgrep -x "$p" >/dev/null 2>&1 && out+=("process $p")
+    done
+    for p in "${SELF_PROC_PATTERNS[@]}"; do
+        [ -n "$(pgrep_other "$p")" ] && out+=("process matching $p")
+    done
+    for p in "${SELF_PORTS[@]}"; do
+        [ -n "$(port_held_by "$p")" ] && out+=("port $p still bound")
+    done
+    [ "$SELF_NETNS" != "__none__" ] && ip netns list 2>/dev/null | grep -qw "$SELF_NETNS" \
+        && out+=("network namespace $SELF_NETNS")
+    printf '%s\n' "${out[@]}"
+}
+
+# Kill whatever the stop scripts left. Only this demo's own signature, never a pattern broad
+# enough to catch another project's processes.
+hard_clean() {
+    local p
+    for p in "${SELF_PROCS[@]}"; do pkill -TERM -x "$p" 2>/dev/null || true; done
+    for p in "${SELF_PROC_PATTERNS[@]}"; do pkill -TERM -f "$p" 2>/dev/null || true; done
+    sleep 2
+    for p in "${SELF_PROCS[@]}"; do pkill -KILL -x "$p" 2>/dev/null || true; done
+    for p in "${SELF_PROC_PATTERNS[@]}"; do pkill -KILL -f "$p" 2>/dev/null || true; done
+
+    # Whatever still holds one of this demo's ports, by pid rather than by name. Node servers
+    # started from a directory show up only as "node server.js" or "node ./bin/www", so no command
+    # line pattern reaches them; the port they are holding is the thing that identifies them.
+    local pid
+    for p in "${SELF_PORTS[@]}"; do
+        for pid in $(ss -lntpH 2>/dev/null | grep -E ":$p\s" | grep -oP 'pid=\K[0-9]+' | sort -u); do
+            kill -TERM "$pid" 2>/dev/null || sudo kill -TERM "$pid" 2>/dev/null || true
+        done
+    done
+    sleep 1
+    for p in "${SELF_PORTS[@]}"; do
+        for pid in $(ss -lntpH 2>/dev/null | grep -E ":$p\s" | grep -oP 'pid=\K[0-9]+' | sort -u); do
+            kill -KILL "$pid" 2>/dev/null || sudo kill -KILL "$pid" 2>/dev/null || true
+        done
+    done
+    [ "$SELF_NETNS" != "__none__" ] && ip netns list 2>/dev/null | grep -qw "$SELF_NETNS" \
+        && sudo ip netns delete "$SELF_NETNS" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- commands
+
+cmd_down() {
+    local all=0 name=""
+    for a in "$@"; do
+        case "$a" in
+            --all) all=1 ;;
+            -*)    echo "Unknown option: $a" >&2; usage 1 ;;
+            *)     name="$a" ;;
+        esac
+    done
+
+    local dir="$DEMO_DIR"
+
+    echo "Stopping the DVB-I demo..."
+    "$dir/stop-all.sh" || true
+
+    # Verify, do not assume. The stop script hands off to external launchers that can fail quietly.
+    local left; mapfile -t left < <(leftovers)
+    if [ "${#left[@]}" -gt 0 ] && [ -n "${left[0]}" ]; then
+        echo
+        echo "Still present after stop-all.sh:"
+        printf '  %s\n' "${left[@]}"
+        echo "Clearing those..."
+        hard_clean
+        mapfile -t left < <(leftovers)
+    fi
+
+    if [ "${#left[@]}" -gt 0 ] && [ -n "${left[0]}" ]; then
+        echo
+        echo "${c_red}Could not fully clean up:${c_off}"
+        printf '  %s\n' "${left[@]}"
+        echo "Something outside this demo may be holding these."
+        [ "$all" -eq 0 ] && exit 1
+    else
+        echo "${c_grn}DVB-I demo stopped, nothing of it left running.${c_off}"
+    fi
+
+    if [ "$all" -eq 1 ]; then
+        local sib
+        for spec in "rt-mbs-examples:${MBS_EXAMPLES_DIR:-}" "rt-mbms-examples:${MBMS_EXAMPLES_DIR:-}"; do
+            sib=$(find_sibling "${spec%%:*}" "${spec#*:}")
+            if [ -n "$sib" ]; then
+                echo
+                echo "--- ${spec%%:*} ($sib)"
+                "$sib/demo" down || true
+            else
+                echo
+                echo "--- ${spec%%:*}: checkout not found, skipping"
+                echo "    set $( [ "${spec%%:*}" = rt-mbs-examples ] && echo MBS_EXAMPLES_DIR || echo MBMS_EXAMPLES_DIR ) to its path"
+            fi
+        done
+    fi
+}
+
+cmd_up() {
+    local force=0
+    for a in "$@"; do
+        case "$a" in
+            --force) force=1 ;;
+            *) echo "Unknown option: $a" >&2; usage 1 ;;
+        esac
+    done
+    if ! doctor && [ "$force" -eq 0 ]; then
+        exit 1
+    fi
+    [ "$force" -eq 1 ] && echo && echo "--force given, starting despite the above."
+    echo
+    exec "$DEMO_DIR/start-all.sh"
+}
+
+cmd_logs() {
+    local log_dir="$DEMO_DIR/run/logs"
+    [ -d "$log_dir" ] || { echo "No logs yet in $log_dir"; exit 0; }
+    if [ -n "${1:-}" ]; then
+        exec tail -f "$log_dir/$1".log
+    fi
+    echo "Logs in $log_dir:"
+    ls -1 "$log_dir" | sed 's/^/  /'
+    echo
+    echo "Tail one with: ./demo logs <name>"
+}
+
+case "${1:-}" in
+    up)     shift; cmd_up "$@" ;;
+    down)   shift; cmd_down "$@" ;;
+    status) exec "$DEMO_DIR/status.sh" ;;
+    doctor) doctor ;;
+    logs)   shift; cmd_logs "${1:-}" ;;
+    ""|-h|--help|help) usage ;;
+    *)      echo "Unknown command: $1" >&2; usage 1 ;;
+esac

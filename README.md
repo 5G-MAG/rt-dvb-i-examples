@@ -14,6 +14,70 @@ Runnable example setups for the DVB-I pair:
 Each example brings the two up against real content, so the pair can be exercised end to end
 without a broadcaster's service list or a public CDN.
 
+## Running the demo
+
+**Before the first run**, once per machine: Node 18 or newer, ffmpeg, python3 and curl, plus the
+DVB-I application and provider checked out and installed beside this repository. The full list is
+in [the demo's Prerequisites](scripts/dvbi-live-demo/README.md#0-prerequisites).
+
+After that, every run is the four commands below.
+
+```bash
+./demo doctor              # will it start here? changes nothing
+./demo up
+./demo status
+./demo down                # stops it and verifies nothing of it is left
+./demo down --all          # stops all three demos, in every repository it can find
+```
+
+`./demo up` runs the checks first and refuses to start on a conflict, naming what to stop. The
+check that matters here is the media origin: this demo runs its own copy of rt-mbs-examples'
+`express-mock-media-server` on port 3004, and the MBS demo in that repository binds the same port
+for its own origin, so the two cannot both be up.
+
+| | this repository | rt-mbs-examples | rt-mbms-examples |
+|---|---|---|---|
+| media origin | :3004 | **:3004, same as this one** | :3005 |
+| admin / client | :4000, :5000 | :8091, :3050 | :8080, :3000 |
+| radio | none | ZMQ 2100, 2101 | ZMQ 2100, 2101 |
+
+The two radio-bearing demos do not take this one's ports, but they are large enough to matter for
+memory, so `doctor` mentions them. Restarting this demo while it is already up is fine and is not
+treated as a conflict, because `start-all.sh` stops it first.
+
+`./demo down` does not trust the stop script. It runs it, then checks this demo's processes and
+ports are actually gone and clears anything left, so the next run starts from nothing. `--all`
+does the same for the other two demos, finding their checkouts beside this one; set
+`MBS_EXAMPLES_DIR` or `MBMS_EXAMPLES_DIR` if they live somewhere unusual.
+
+Add `--force` to `up` to start anyway. `DEMO_MIN_FREE_MB` overrides the memory floor.
+
+The scripts under `scripts/dvbi-live-demo/` are unchanged and can still be run directly.
+
+### Demo content
+
+Content starts with the demo. `./demo up` launches one looping ffmpeg encoder per channel and
+publishes a DVB-I service list describing them, so there is nothing extra to run.
+
+The source clips live in `~/MWC_TV_RADIO/` (`TV_1.mp4`, `RADIO.mp4` and their logos), set by
+`CONTENT_ROOT`. That directory is required: without it the encoders have nothing to loop and the
+client shows an empty list.
+
+```bash
+# check content is actually flowing, once the demo is up
+./demo status                       # per channel: LIVE, how long ago it last published, segments
+curl -s http://localhost:4000/service-list.xml | head
+```
+
+The three channels are defined in `scripts/dvbi-live-demo/channels.json`: logical channel number,
+name, logo and source clip. After editing it:
+
+```bash
+scripts/dvbi-live-demo/regen-service-list.sh    # rebuild the service list from channels.json
+```
+
+Open the client at http://localhost:5000 and the admin at http://localhost:4000.
+
 ## Start here
 
 - **[Running the pair, end to end](docs/running-the-pair.md)** -- the two applications from a clean
