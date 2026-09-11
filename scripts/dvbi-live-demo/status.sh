@@ -28,9 +28,12 @@ echo
 echo "endpoints:"
 # Any HTTP response means the server is listening. The origin's own root returns 404 by design
 # (static files, directory listing off), so the status code alone is not the health signal here.
-for entry in "media origin|$MEDIA_ORIGIN/" "admin|$ADMIN_ORIGIN/service-list.xml" "client|$CLIENT_ORIGIN/health"; do
+for entry in "media origin|$MEDIA_ORIGIN/" "provider|$ADMIN_ORIGIN/service-list.xml" "registry|$REGISTRY_ORIGIN/health" "client|$CLIENT_ORIGIN/health"; do
     IFS='|' read -r label url <<< "$entry"
-    code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$url" 2>/dev/null || echo 000)
+    # See the note in lib.sh: a "|| echo 000" fallback here produced "000000" for an unreachable
+    # endpoint, which this then reported as listening.
+    code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$url" 2>/dev/null)
+    [[ -z "$code" ]] && code=000
     if [[ "$code" == "000" ]]; then
         printf '  \033[1;31m%-14s no response\033[0m  %s\n' "$label" "$url"
     else

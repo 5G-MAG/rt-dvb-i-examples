@@ -55,7 +55,11 @@ wait_http() {  # wait_http <url> <seconds>
 wait_http_any() {  # wait_http_any <url> <seconds>
     local i code
     for ((i = 0; i < $2; i++)); do
-        code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$1" 2>/dev/null || echo 000)
+        # curl prints 000 AND exits non-zero when it cannot connect, so a "|| echo 000" fallback
+        # appends a second one and yields "000000", which compares unequal to "000" and made this
+        # check report a dead server as up. Take curl's output as it is and treat empty as 000.
+        code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$1" 2>/dev/null)
+        [[ -z "$code" ]] && code=000
         [[ "$code" != "000" ]] && return 0
         sleep 1
     done
