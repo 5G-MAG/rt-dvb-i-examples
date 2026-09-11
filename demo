@@ -180,12 +180,26 @@ leftovers() {
 # Kill whatever the stop scripts left. Only this demo's own signature, never a pattern broad
 # enough to catch another project's processes.
 hard_clean() {
+    # Some of these run as root inside a namespace (the UE needs root for its TUN device), so an
+    # unprivileged pkill silently fails on them. Fall back to sudo rather than report a clean stop
+    # that did not happen.
     local p
-    for p in "${SELF_PROCS[@]}"; do pkill -TERM -x "$p" 2>/dev/null || true; done
-    for p in "${SELF_PROC_PATTERNS[@]}"; do pkill -TERM -f "$p" 2>/dev/null || true; done
+    for p in "${SELF_PROCS[@]}"; do
+        pkill -TERM -x "$p" 2>/dev/null || sudo -n pkill -TERM -x "$p" 2>/dev/null || true
+    done
+    for p in "${SELF_PROC_PATTERNS[@]}"; do
+        # Bracketing the first character keeps the pattern from matching the argv of the sudo
+        # that is running the pkill: pkill skips itself, but not its parent, so an unbracketed
+        # pattern kills the sudo and the shell reports a stray "Killed".
+        pkill -TERM -f "[${p:0:1}]${p:1}" 2>/dev/null || sudo -n pkill -TERM -f "[${p:0:1}]${p:1}" 2>/dev/null || true
+    done
     sleep 2
-    for p in "${SELF_PROCS[@]}"; do pkill -KILL -x "$p" 2>/dev/null || true; done
-    for p in "${SELF_PROC_PATTERNS[@]}"; do pkill -KILL -f "$p" 2>/dev/null || true; done
+    for p in "${SELF_PROCS[@]}"; do
+        pkill -KILL -x "$p" 2>/dev/null || sudo -n pkill -KILL -x "$p" 2>/dev/null || true
+    done
+    for p in "${SELF_PROC_PATTERNS[@]}"; do
+        pkill -KILL -f "[${p:0:1}]${p:1}" 2>/dev/null || sudo -n pkill -KILL -f "[${p:0:1}]${p:1}" 2>/dev/null || true
+    done
 
     # Whatever still holds one of this demo's ports, by pid rather than by name. Node servers
     # started from a directory show up only as "node server.js" or "node ./bin/www", so no command
