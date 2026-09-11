@@ -113,9 +113,50 @@
       ]
     },
     {
+      "id": "mwc-tv-3",
+      "name": "5G-MAG.tv 3",
+      "lcn": 3,
+      "type": "linear",
+      "genre": "entertainment",
+      "parentalRating": 0,
+      "source": "TV_3.mp4",
+      "stream": "tv_3_live",
+      "logo": "TV_3.png",
+      "logoBg": "#6d4aa7",
+      "letters": "TV3",
+      "languages": [{ "lang": "fr" }, { "lang": "it" }],
+      "audioDescription": true,
+      "hardOfHearing": false,
+      "subtitleLanguage": "en",
+      "programmes": [
+        {
+          "title": "Open Source Hour",
+          "dur": 60,
+          "desc": "The reference implementations behind the demos, one repository at a time, and what it takes to run them.",
+          "genre": "factual",
+          "parentalAge": 0,
+          "series": { "title": "Open Source Hour", "number": 1, "episode": 5 }
+        },
+        {
+          "title": "Spectrum and Coverage",
+          "dur": 30,
+          "desc": "Why a broadcast bearer reaches where unicast does not, and what that costs in planning.",
+          "genre": "documentary",
+          "parentalAge": 0
+        },
+        {
+          "title": "Workshop Replay",
+          "dur": 90,
+          "desc": "The long version of the stand demonstration, recorded end to end with nothing cut.",
+          "genre": "entertainment",
+          "parentalAge": 0
+        }
+      ]
+    },
+    {
       "id": "mwc-radio",
       "name": "5G-MAG.radio",
-      "lcn": 3,
+      "lcn": 4,
       "type": "radio",
       "genre": "music",
       "parentalRating": 0,
