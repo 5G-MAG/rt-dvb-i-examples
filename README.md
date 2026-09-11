@@ -86,9 +86,11 @@ Open the client at http://localhost:5000 and the admin at http://localhost:4000.
 
 ## Assessments
 
-- **[DVB-I over 5G](docs/dvb-i-over-5g.md)** -- what carrying these services over a 5G system would
-  require: what the standards already specify (more than expected), what is still missing from them,
-  and which of the missing pieces these repositories could supply.
+- **DVB-I over 5G** -- what carrying these services over a 5G system would require: what the
+  standards already specify (more than expected), what is still missing from them, and which of the
+  missing pieces these repositories could supply. It lives with the conformance record it belongs
+  beside, in `rt-dvb-i-application-provider/DVB-I-OVER-5G.md`, rather than being copied here where
+  the two would drift apart.
 
 ## Examples
 
