@@ -10,6 +10,7 @@ Runnable example setups for the DVB-I pair:
 - **`rt-dvb-i-application-provider`** publishes a DVB-I service list (the Application Provider and
   admin portal)
 - **`rt-dvb-i-application`** discovers that list and plays the channels in it (the receiver)
+- **`rt-dvb-i-service-list-registry`** tells a receiver which service lists exist (discovery)
 
 Each example brings the two up against real content, so the pair can be exercised end to end
 without a broadcaster's service list or a public CDN.
