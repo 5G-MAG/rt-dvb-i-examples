@@ -27,13 +27,13 @@ preflight() {
     require_cmd python3 "Install it: apt install python3"
     [[ -d "$CONTENT_ROOT" ]] || die "content not found: $CONTENT_ROOT (set CONTENT_ROOT in env.sh)"
     [[ -f "$LIVE_ENCODER" ]] || die "live encoder not found: $LIVE_ENCODER (set MBS_EXAMPLES_ROOT in env.sh)"
-    for d in "$MEDIA_DIR" "$ADMIN_DIR" "$CLIENT_DIR"; do
+    for d in "$MEDIA_DIR" "$ADMIN_DIR" "$CLIENT_DIR" "$REGISTRY_DIR"; do
         [[ -d "$d" ]] || die "not found: $d (check the paths in env.sh)"
     done
     while IFS='|' read -r id name lcn source stream; do
         [[ -f "$CONTENT_ROOT/$source" ]] || die "missing source media for $id: $CONTENT_ROOT/$source"
     done < <(channel_lines)
-    for d in "$MEDIA_DIR" "$ADMIN_DIR" "$CLIENT_DIR"; do
+    for d in "$MEDIA_DIR" "$ADMIN_DIR" "$CLIENT_DIR" "$REGISTRY_DIR"; do
         [[ -d "$d/node_modules" ]] || { log "installing dependencies in $d"; (cd "$d" && npm install --no-audit --no-fund); }
     done
 }
@@ -75,11 +75,11 @@ PYEOF
 preflight
 backup_admin_config
 
-log "=== 1/4 local media origin ==="
+log "=== 1/5 local media origin ==="
 run_bg media-server env HOST="$MEDIA_HOST" PORT="$MEDIA_PORT" node "$MEDIA_DIR/bin/www"
 wait_http_any "$MEDIA_ORIGIN/" 20 || die "the media origin did not come up, see $LOG_DIR/media-server.log"
 
-log "=== 2/4 live encoders ==="
+log "=== 2/5 live encoders ==="
 while IFS='|' read -r id name lcn source stream; do
     run_bg "encoder-$id" env \
         LIVE_SRC="$CONTENT_ROOT/$source" \
@@ -94,7 +94,7 @@ while IFS='|' read -r id name lcn source stream; do
     log "  $stream ready"
 done < <(channel_lines)
 
-log "=== 3/4 DVB-I admin ==="
+log "=== 3/5 DVB-I Application Provider ==="
 # Written before the admin starts: it reads config.json once at startup (rt-dvb-i-application-provider/server.js
 # loads it into a module-level `config`), so a list generated afterwards would not be served
 # until the admin is restarted. Use ./regen-service-list.sh for that case.
@@ -104,7 +104,14 @@ log "generating the service list from $(basename "$CHANNELS_FILE")"
 run_bg rt-dvb-i-application-provider env PORT="$ADMIN_PORT" node "$ADMIN_DIR/server.js"
 wait_http "http://127.0.0.1:$ADMIN_PORT/service-list.xml" 20 || die "the admin did not come up, see $LOG_DIR/rt-dvb-i-application-provider.log"
 
-log "=== 4/4 DVB-I client ==="
+log "=== 4/5 Service List Registry ==="
+# Started before the receiver so discovery can be answered the moment a viewer opens the page.
+# It lists the provider's service list, which is how a client gets from "which lists exist?" to
+# a URL without one being typed in.
+run_bg rt-dvb-i-service-list-registry env PORT="$REGISTRY_PORT" node "$REGISTRY_DIR/server.js"
+wait_http "$REGISTRY_ORIGIN/health" 20 || die "the registry did not come up, see $LOG_DIR/rt-dvb-i-service-list-registry.log"
+
+log "=== 5/5 DVB-I client ==="
 # PROXY_ALLOW_ORIGINS: see the note on it in env.sh. Without it the receiver's /proxy refuses to
 # fetch the service list, because the provider is on loopback.
 run_bg rt-dvb-i-application env PORT="$CLIENT_PORT" PROXY_ALLOW_ORIGINS="$PROXY_ALLOW_ORIGINS" node "$CLIENT_DIR/server.js"
@@ -113,7 +120,8 @@ wait_http "http://127.0.0.1:$CLIENT_PORT/health" 20 || die "the client did not c
 echo
 log "up:"
 echo "  DVB-I client (open this)   ->  $CLIENT_ORIGIN"
-echo "  DVB-I admin                ->  $ADMIN_ORIGIN"
+echo "  Application Provider       ->  $ADMIN_ORIGIN"
+echo "  Service List Registry      ->  $REGISTRY_ORIGIN/query?TargetCountry=CHE"
 echo "  Service list               ->  $ADMIN_ORIGIN/service-list.xml"
 echo "  Local origin               ->  $MEDIA_ORIGIN/"
 echo

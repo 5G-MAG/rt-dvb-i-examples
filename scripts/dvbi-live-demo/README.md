@@ -12,14 +12,40 @@ built to run it. Nothing leaves the machine: every service binds loopback.
 
 These steps are the whole procedure. Following them from a cold machine reproduces the demo.
 
-## What runs
+## The architecture, and how the pieces fit
 
-| Component | Address | Comes from |
-|---|---|---|
-| Media origin | `127.0.0.1:3004` | `rt-mbs-examples/express-mock-media-server` |
-| Live encoder, one per channel | writes into that origin | `rt-mbs-examples/scripts/mbs-broadcast-demo/live-encoder.sh` |
-| DVB-I Application Provider | `localhost:4000` | `rt-dvb-i-application-provider` |
-| DVB-I Application (the receiver) | `localhost:5000` | `rt-dvb-i-application` |
+DVB-I separates discovery, metadata and media. This demo runs all of it on one machine, so the
+whole chain is visible:
+
+```
+  registry            "which service lists exist for CHE?"
+  :7000        <───────────────────────────────────────────────┐
+    │  returns the provider's service list URL                 │
+    ↓                                                          │
+  provider           service list: which channels exist,       │  receiver
+  :4000        ───── where their media is, what is on ─────►   │  :5000
+    │                content guide: schedule and now/next      │
+    │                                                          │
+  origin             the media itself, DASH segments ──────────┘
+  :3004
+    ↑
+  encoders           your files, encoded live on repeat
+```
+
+A receiver with nothing configured asks the **registry** which lists exist. It gets back a URL,
+fetches that **service list** from the provider, and shows the channels. Selecting one plays media
+from the **origin**, while the provider separately answers for the content guide.
+
+| Component | Address | Repository | Role in TS 103 770 clause 4.1 |
+|---|---|---|---|
+| Service List Registry | `localhost:7000` | `rt-dvb-i-service-list-registry` | Service List Registry |
+| Application Provider | `localhost:4000` | `rt-dvb-i-application-provider` | Service List Server and Content Guide Server |
+| Receiver | `localhost:5000` | `rt-dvb-i-application` | DVB-I client |
+| Media origin | `127.0.0.1:3004` | `rt-mbs-examples/express-mock-media-server` | MPD server |
+| Live encoder, one per channel | writes into the origin | `rt-mbs-examples/.../live-encoder.sh` | not a DVB-I component; it produces the content |
+
+The registry's port is 7000 rather than 6000 because 6000 is on the WHATWG blocked-ports list: a
+browser refuses to fetch from it, and so does Node.
 
 Only the server side of the MBS broadcast demo is borrowed: the origin and the encoder. That is
 the one dependency this demo has on the MBS repositories.
@@ -92,7 +118,8 @@ processes:
 
 endpoints:
   media origin   listening  (HTTP 404)  http://127.0.0.1:3004/
-  admin          listening  (HTTP 200)  http://localhost:4000/service-list.xml
+  provider       listening  (HTTP 200)  http://localhost:4000/service-list.xml
+  registry       listening  (HTTP 200)  http://localhost:7000/health
   client         listening  (HTTP 200)  http://localhost:5000/health
 
 channels:
@@ -124,7 +151,31 @@ controls act on if a threshold is set; the other two are unrated.
 If it shows no channels, the list is not reaching it. Confirm
 `http://localhost:4000/service-list.xml` loads in a browser tab, then see Troubleshooting.
 
-## 4. See the service list itself
+## 4. Use discovery, rather than a URL you typed
+
+The receiver loads a known URL by default, which is convenient but skips the part of DVB-I that
+finds it. To exercise discovery instead:
+
+1. Press `S` for settings
+2. Set **Service List Registry** to `http://localhost:7000/query`
+3. Enter a country code the demo's list is offered in: `CHE`, `DEU` or `ESP`
+4. Press **Look up**
+
+The receiver asks the registry, which answers with the lists it knows for that country, and the
+receiver loads the one it is given. Asking for `ITA` returns a different, non-existent list, which
+is the registry doing its job rather than a fault.
+
+You can ask the registry directly too:
+
+```bash
+curl "http://localhost:7000/query?TargetCountry=CHE"
+curl "http://localhost:7000/query?regulatorListFlag=true"
+curl "http://localhost:7000/query?Delivery[]=dash&Delivery[]=dvb-t"
+```
+
+What it offers is `rt-dvb-i-service-list-registry/registry.json`.
+
+## 5. See the service list itself
 
 ```bash
 curl http://localhost:4000/service-list.xml
@@ -136,7 +187,7 @@ That is the DVB-I service list the receiver consumes: three `<Service>` entries,
 The provider's own UI at **http://localhost:4000** shows the same list as an editable form, with an
 XML preview, a Validate action and version history.
 
-## 5. Load the demo line-up as a template
+## 6. Load the demo line-up as a template
 
 The provider ships this demo's channels as a loadable template, so the exact line-up can be
 restored, or dropped into another provider instance, without running the generator:
@@ -162,7 +213,7 @@ looks like when set.
 
 Its stream URLs point at loopback, so they only resolve while this demo is running.
 
-## 6. Change the line-up
+## 7. Change the line-up
 
 `channels.json` is the single definition of what is broadcast. The encoders, the published service
 list and the loadable template are all generated from it, so they cannot disagree.
@@ -245,7 +296,7 @@ After editing:After editing:
 so rewriting that file while it runs changes nothing a receiver can see. The receiver picks the new
 list up within its own 30 s poll.
 
-## 7. Stop it
+## 8. Stop it
 
 ```bash
 ./stop-all.sh

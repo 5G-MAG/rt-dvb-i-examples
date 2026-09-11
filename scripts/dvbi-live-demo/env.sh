@@ -13,6 +13,7 @@ REPOS_ROOT="${REPOS_ROOT:-$HOME/Repos}"
 DVBI_ROOT="${DVBI_ROOT:-$REPOS_ROOT/DVB-I}"
 ADMIN_DIR="${ADMIN_DIR:-$DVBI_ROOT/rt-dvb-i-application-provider}"
 CLIENT_DIR="${CLIENT_DIR:-$DVBI_ROOT/rt-dvb-i-application}"
+REGISTRY_DIR="${REGISTRY_DIR:-$DVBI_ROOT/rt-dvb-i-service-list-registry}"
 
 # The media origin and the looping live encoder are taken from rt-mbs-examples rather than
 # reimplemented here. Only its server side is used: no 5G core, no MBSF/MBSTF, no RAN and no
@@ -32,9 +33,14 @@ MEDIA_PORT="${MEDIA_PORT:-3004}"
 ADMIN_PORT="${ADMIN_PORT:-4000}"
 CLIENT_PORT="${CLIENT_PORT:-5000}"
 
+# The Service List Registry: the component a client asks which service lists exist, so the demo can
+# show discovery rather than starting from a URL somebody typed in.
+REGISTRY_PORT="${REGISTRY_PORT:-7000}"
+
 MEDIA_ORIGIN="http://$MEDIA_HOST:$MEDIA_PORT"
 ADMIN_ORIGIN="http://localhost:$ADMIN_PORT"
 CLIENT_ORIGIN="http://localhost:$CLIENT_PORT"
+REGISTRY_ORIGIN="http://localhost:$REGISTRY_PORT"
 
 # ------------------------------------------------------------------------------------
 # Encoding
@@ -60,6 +66,8 @@ CHANNELS_FILE="${CHANNELS_FILE:-$DEMO_ROOT/channels.json}"
 # Both spellings of the provider's origin are needed: the receiver loads the service list from
 # localhost:4000, while the ContentGuideSource inside that list points at 127.0.0.1:4000, and an
 # allowlist entry is an origin rather than a host.
-PROXY_ALLOW_ORIGINS="${PROXY_ALLOW_ORIGINS:-http://localhost:$ADMIN_PORT,http://127.0.0.1:$ADMIN_PORT}"
+# The registry's origin is named too: the receiver reaches it through the same guarded proxy, so
+# discovery fails with a 400 if it is left out.
+PROXY_ALLOW_ORIGINS="${PROXY_ALLOW_ORIGINS:-http://localhost:$ADMIN_PORT,http://127.0.0.1:$ADMIN_PORT,http://localhost:$REGISTRY_PORT,http://127.0.0.1:$REGISTRY_PORT}"
 
 set +a
