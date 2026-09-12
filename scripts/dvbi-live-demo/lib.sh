@@ -14,10 +14,16 @@ require_cmd() {
 # Reads channels.json and prints one "id|name|lcn|source|stream" line per channel, so the
 # shell scripts and write-service-list.py work from the same definition rather than each
 # carrying their own copy of the line-up.
+# DEMO_CHANNELS limits the line-up to the ids it names (space or comma separated), for a machine
+# that cannot encode all of them at once: one looping encoder per channel is this demo's largest
+# cost by far. The service list is generated from the same filtered set, so the receiver is never
+# offered a channel that nothing is encoding. Unset, the whole line-up runs.
 channel_lines() {
     python3 - "$CHANNELS_FILE" <<'PYEOF'
-import json, sys
+import json, os, sys
+only = [x for x in os.environ.get("DEMO_CHANNELS", "").replace(",", " ").split() if x]
 for c in json.load(open(sys.argv[1]))["channels"]:
+    if only and c["id"] not in only: continue
     print("|".join(str(c[k]) for k in ("id", "name", "lcn", "source", "stream")))
 PYEOF
 }

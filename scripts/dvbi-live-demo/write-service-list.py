@@ -176,6 +176,12 @@ def reconcile_versions(services, existing):
 def main():
     with open(CHANNELS_FILE) as f:
         channels = json.load(f)["channels"]
+
+    # Same DEMO_CHANNELS filter the encoders honour (lib.sh, channel_lines). Applied here too so
+    # the published list never offers a service that nothing is encoding.
+    only = [x for x in os.environ.get("DEMO_CHANNELS", "").replace(",", " ").split() if x]
+    if only:
+        channels = [c for c in channels if c["id"] in only]
     services = [service(c) for c in channels]
 
     if EMIT_TEMPLATE:
