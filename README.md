@@ -40,11 +40,19 @@ for its own origin, so the two cannot both be up.
 |---|---|---|---|
 | media origin | :3004 | **:3004, same as this one** | :3005 |
 | admin / client | :4000, :5000 | :8091, :3050 | :8080, :3000 |
+| service list registry | :7000 | none | none |
 | radio | none | ZMQ 2100, 2101 | ZMQ 2100, 2101 |
 
-The two radio-bearing demos do not take this one's ports, but they are large enough to matter for
-memory, so `doctor` mentions them. Restarting this demo while it is already up is fine and is not
-treated as a conflict, because `start-all.sh` stops it first.
+**This demo and the MBMS one can run at the same time.** They share no port, no network namespace
+and no process name: this one's origin is `express-mock-media-server` on :3004, the MBMS demo runs
+its own `media-server.js` on :3005, and neither `down` can reach the other's processes. Start them
+in either order. The only thing they compete for is memory, which is why `doctor` mentions a
+neighbouring demo rather than refusing to start; on a machine that is tight, bring up the MBMS one
+first, since it is the larger of the two.
+
+The MBS demo is the exception: it takes :3004 for its own origin, so it and this one cannot both
+be up. Restarting this demo while it is already up is fine and is not treated as a conflict,
+because `start-all.sh` stops it first.
 
 `./demo down` does not trust the stop script. It runs it, then checks this demo's processes and
 ports are actually gone and clears anything left, so the next run starts from nothing. `--all`

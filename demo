@@ -29,8 +29,8 @@ MIN_FREE_MB="${DEMO_MIN_FREE_MB:-1500}"
 # What this demo owns. `down` uses these to prove it actually stopped rather than assuming the
 # stop script worked.
 SELF_PROCS=()
-SELF_PROC_PATTERNS=("rt-dvb-i-application" "express-mock-media-server")
-SELF_PORTS=(3004 4000 5000)
+SELF_PROC_PATTERNS=("rt-dvb-i-application" "rt-dvb-i-service-list-registry" "express-mock-media-server")
+SELF_PORTS=(3004 4000 5000 7000)
 SELF_NETNS="__none__"
 
 # Sibling demo checkouts, for `down --all`.
@@ -101,10 +101,10 @@ check_memory() {
     return 0
 }
 
-# The media origin port, and the ports the admin and client bind.
+# The media origin port, and the ports the admin, client and service list registry bind.
 check_ports() {
     local rc=0 found=0 holder proc
-    for p in 3004 4000 5000; do
+    for p in "${SELF_PORTS[@]}"; do
         holder=$(port_held_by "$p") || true
         [ -z "$holder" ] && continue
         found=1
@@ -123,7 +123,7 @@ check_ports() {
         fi
         rc=1
     done
-    [ "$rc" -eq 0 ] && [ "$found" -eq 0 ] && ok "ports 3004, 4000 and 5000 are free"
+    [ "$rc" -eq 0 ] && [ "$found" -eq 0 ] && ok "ports ${SELF_PORTS[*]} are free"
     return "$rc"
 }
 
