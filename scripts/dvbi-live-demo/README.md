@@ -162,15 +162,16 @@ finds it. To exercise discovery instead:
 4. Press **Look up**
 
 The receiver asks the registry, which answers with the lists it knows for that country, and the
-receiver loads the one it is given. Asking for `ITA` returns a different, non-existent list, which
-is the registry doing its job rather than a fault.
+receiver loads the one it is given. Asking for a country the demo's list is not offered in, `ITA`
+for instance, returns an empty answer rather than an error: that is the registry filtering, not a
+fault.
 
 You can ask the registry directly too:
 
 ```bash
 curl "http://localhost:7000/query?TargetCountry=CHE"
-curl "http://localhost:7000/query?regulatorListFlag=true"
-curl "http://localhost:7000/query?Delivery[]=dash&Delivery[]=dvb-t"
+curl "http://localhost:7000/query?TargetCountry[]=CHE&TargetCountry[]=DEU"
+curl "http://localhost:7000/query?Delivery=dvb-dash"
 ```
 
 What it offers is `rt-dvb-i-service-list-registry/registry.json`.
