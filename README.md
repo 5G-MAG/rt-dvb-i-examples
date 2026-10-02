@@ -45,9 +45,9 @@ broadcaster's service list or a public CDN.
 
 ### What this reuses, and what it does not
 
-The media origin and the looping live encoder come from
-[rt-mbs-examples](https://github.com/5G-MAG/rt-mbs-examples): `express-mock-media-server` and
-`scripts/mbs-broadcast-demo/live-encoder.sh`. Only that server side is used.
+The media origin is [rt-media-origin](https://github.com/5G-MAG/rt-media-origin), configured from
+the demo's `channels.json`. It loops each channel's source with its own ffmpeg, packages it as live
+DASH and serves it.
 
 Nothing from the 5G stack takes part. There is no multicast, no core network, no MBSF or MBSTF, no
 gNB or UE and no MBS client, and none of them needs to be built. What is exercised here is DVB-I
@@ -77,8 +77,9 @@ Once per machine:
 - Node.js 18 or newer, and npm
 - ffmpeg
 - python3 and curl
-- checkouts of `rt-dvb-i-application-provider`, `rt-dvb-i-application` and `rt-mbs-examples`
-  (paths are set in each example's `env.sh`)
+- checkouts of `rt-dvb-i-application-provider`, `rt-dvb-i-application`,
+  `rt-dvb-i-service-list-registry` and `rt-media-origin` (paths are set in each example's `env.sh`)
+- the Genre classification scheme files the registry needs (`GENRE_CS_DIR`)
 - your own media files to broadcast
 
 The DVB-I application and provider must be checked out and installed beside this repository. The
@@ -117,9 +118,8 @@ Every run is the commands below.
 ```
 
 `./demo up` runs the checks first and refuses to start on a conflict, naming what to stop. The
-check that matters here is the media origin: this demo runs its own copy of rt-mbs-examples'
-`express-mock-media-server` on port 3004, and the MBS demo in that repository binds the same port
-for its own origin, so the two cannot both be up.
+check that matters here is the media origin: this demo runs rt-media-origin on port 3004, and the
+MBS demo in rt-mbs-examples binds the same port for its own origin, so the two cannot both be up.
 
 | | this repository | rt-mbs-examples | rt-mbms-examples |
 |---|---|---|---|
@@ -129,7 +129,7 @@ for its own origin, so the two cannot both be up.
 | radio | none | ZMQ 2100, 2101 | ZMQ 2100, 2101 |
 
 **This demo and the MBMS one can run at the same time.** They share no port, no network namespace
-and no process name: this one's origin is `express-mock-media-server` on :3004, the MBMS demo runs
+and no process name: this one's origin is rt-media-origin on :3004, the MBMS demo runs
 its own `media-server.js` on :3005, and neither `down` can reach the other's processes. Start them
 in either order. The only thing they compete for is memory, which is why `doctor` mentions a
 neighbouring demo rather than refusing to start. On a machine that is tight, bring up the MBMS one
@@ -179,8 +179,10 @@ scripts/dvbi-live-demo/regen-service-list.sh    # rebuild the service list from 
 ## Development
 
 The service list generator has a unittest suite, `scripts/dvbi-live-demo/test_generator.py`
-(17 cases). One case compares the shipped list template with what `channels.json` would produce and
-needs the provider checked out beside this repository; without it, that case is skipped. The CI
+(32 cases). One case compares the shipped list template with what `channels.json` would produce and
+needs the provider checked out beside this repository, and one validates the generated
+rt-media-origin configuration with that repository's own validator and needs it checked out with
+its dependencies; without them, those cases are skipped. The CI
 workflow in `.github/workflows/test.yml` runs the suite, checks that the demo shell scripts parse,
 checks that `channels.json` is valid JSON, and runs the citation check, which skips there because
 no specification text is available to it.
@@ -207,7 +209,6 @@ comment claims; only reading does that.
 ```
 scripts/dvbi-live-demo/   the live demo: channel line-up, start/stop/status, service list generator
 tools/                    the citation checker
-backups/                  the provider's service list as it was before an example first replaced it
 ```
 
 ## Contributing

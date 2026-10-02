@@ -15,12 +15,11 @@ ADMIN_DIR="${ADMIN_DIR:-$DVBI_ROOT/rt-dvb-i-application-provider}"
 CLIENT_DIR="${CLIENT_DIR:-$DVBI_ROOT/rt-dvb-i-application}"
 REGISTRY_DIR="${REGISTRY_DIR:-$DVBI_ROOT/rt-dvb-i-service-list-registry}"
 
-# The media origin and the looping live encoder are taken from rt-mbs-examples rather than
-# reimplemented here. Only its server side is used: no 5G core, no MBSF/MBSTF, no RAN and no
-# MBS client take part in this demo, and none needs to be built for it.
-MBS_EXAMPLES_ROOT="${MBS_EXAMPLES_ROOT:-$REPOS_ROOT/rt-mbs/rt-mbs-examples}"
-MEDIA_DIR="${MEDIA_DIR:-$MBS_EXAMPLES_ROOT/express-mock-media-server}"
-LIVE_ENCODER="${LIVE_ENCODER:-$MBS_EXAMPLES_ROOT/scripts/mbs-broadcast-demo/live-encoder.sh}"
+# The media origin is rt-media-origin: one process that loops each channel's source with its own
+# ffmpeg, packages it as live DASH and serves it. Its configuration is generated from
+# channels.json into this demo's run/ directory (write-origin-config.py); nothing is written into
+# the rt-media-origin checkout.
+MEDIA_ORIGIN_DIR="${MEDIA_ORIGIN_DIR:-$REPOS_ROOT/rt-media-origin}"
 
 # Source media. Read-only: the scripts play from here and never write into it.
 CONTENT_ROOT="${CONTENT_ROOT:-$HOME/MWC_TV_RADIO}"
@@ -50,6 +49,16 @@ REGISTRY_ORIGIN="http://localhost:$REGISTRY_PORT"
 # at the cost of more requests.
 LIVE_SEG_DURATION="${LIVE_SEG_DURATION:-4}"
 
+# Segments the live manifest advertises, and segments kept on disk beyond that for requests still
+# in flight. rt-media-origin deletes anything older, so a channel left running does not fill the
+# disk. Defaults carried over from the encoder this demo used before (live-encoder.sh).
+LIVE_WINDOW="${LIVE_WINDOW:-24}"
+LIVE_EXTRA_WINDOW="${LIVE_EXTRA_WINDOW:-48}"
+
+# Video bit rate of every channel's single 960x540 H.264 rendition. An operator setting, no clause
+# governs it; the default is the previous encoder's.
+LIVE_VIDEO_BITRATE="${LIVE_VIDEO_BITRATE:-400k}"
+
 # ------------------------------------------------------------------------------------
 # Run-time state: logs and pidfiles under this script directory's own run/, not /tmp.
 # ------------------------------------------------------------------------------------
@@ -58,6 +67,25 @@ RUN_DIR="$DEMO_ROOT/run"
 LOG_DIR="$RUN_DIR/logs"
 PID_DIR="$RUN_DIR/pids"
 CHANNELS_FILE="${CHANNELS_FILE:-$DEMO_ROOT/channels.json}"
+# The generated rt-media-origin configuration, and the directories its channels write into.
+ORIGIN_CONFIG="$RUN_DIR/origin/config.json"
+ORIGIN_OUTPUT_ROOT="$RUN_DIR/origin/media"
+# The provider's own files as they were before this demo first wrote over them: its config.json
+# and any channel logos install_logos (start-all.sh) replaces. stop-all.sh puts them back.
+PROVIDER_SAVED_DIR="$RUN_DIR/provider-saved"
+
+# What the provider is told about TLS. Without HTTPS_KEY_PATH and HTTPS_CERT_PATH it serves plain
+# HTTP; an earlier issue of rt-dvb-i-application-provider refused to do so unless PLAIN_HTTP named
+# the case, and the current one accepts "private-subnet" as meaning the same as leaving it unset.
+# Passed to the provider only (start-all.sh, regen-service-list.sh), under its own name here so
+# that exporting it does not hand PLAIN_HTTP to every other process.
+ADMIN_PLAIN_HTTP="${ADMIN_PLAIN_HTTP:-private-subnet}"
+
+# The registry refuses to start without GENRE_CS_DIR: a directory holding the classification
+# schemes its Genre query values are checked against, ContentCS.xml and FormatCS.xml (TV-Anytime)
+# and DVBContentSubjectCS-2019.xml (from the TS 103 770 attachment archive). They are never
+# carried in these repositories; see the registry's README for where each comes from.
+GENRE_CS_DIR="${GENRE_CS_DIR:-$HOME/.local/share/dvb-i-schemas/etsi}"
 
 # The receiver's /proxy refuses to fetch from loopback and private addresses (its own SSRF guard),
 # which is exactly where the provider sits in this demo. PROXY_ALLOW_ORIGINS names the origins it

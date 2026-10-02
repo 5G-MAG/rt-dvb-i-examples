@@ -13,6 +13,7 @@ source env.sh
 source lib.sh
 ensure_dirs
 
+save_provider_state
 log "generating the service list from $(basename "$CHANNELS_FILE")"
 ./write-service-list.py
 
@@ -24,7 +25,8 @@ if is_running rt-dvb-i-application-provider; then
     log "admin stopped (pid $pid)"
 fi
 
-run_bg rt-dvb-i-application-provider env PORT="$ADMIN_PORT" node "$ADMIN_DIR/server.js"
+# PLAIN_HTTP: see ADMIN_PLAIN_HTTP in env.sh.
+run_bg rt-dvb-i-application-provider env PORT="$ADMIN_PORT" PLAIN_HTTP="$ADMIN_PLAIN_HTTP" node "$ADMIN_DIR/server.js"
 wait_http "http://127.0.0.1:$ADMIN_PORT/service-list.xml" 20 || die "the admin did not come back up, see $LOG_DIR/rt-dvb-i-application-provider.log"
 log "service list republished: $ADMIN_ORIGIN/service-list.xml"
 log "the client re-reads it within 30s (its own poll interval), or reload the page"

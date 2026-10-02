@@ -27,9 +27,7 @@ whole chain is visible:
     │                content guide: schedule and now/next      │
     │                                                          │
   origin             the media itself, DASH segments ──────────┘
-  :3004
-    ↑
-  encoders           your files, encoded live on repeat
+  :3004              rt-media-origin: your files, encoded live on repeat
 ```
 
 A receiver with nothing configured asks the **registry** which lists exist. It gets back a URL,
@@ -41,14 +39,15 @@ from the **origin**, while the provider separately answers for the content guide
 | Service List Registry | `localhost:7000` | `rt-dvb-i-service-list-registry` | Service List Registry |
 | Application Provider | `localhost:4000` | `rt-dvb-i-application-provider` | Service List Server and Content Guide Server |
 | Receiver | `localhost:5000` | `rt-dvb-i-application` | DVB-I client |
-| Media origin | `127.0.0.1:3004` | `rt-mbs-examples/express-mock-media-server` | MPD server |
-| Live encoder, one per channel | writes into the origin | `rt-mbs-examples/.../live-encoder.sh` | not a DVB-I component; it produces the content |
+| Media origin | `127.0.0.1:3004` | `rt-media-origin` | MPD server |
+| Live encoder, one per channel | run by the origin | `rt-media-origin` (one ffmpeg per channel) | not a DVB-I component; it produces the content |
 
 The registry's port is 7000 rather than 6000 because 6000 is on the WHATWG blocked-ports list: a
 browser refuses to fetch from it, and so does Node.
 
-Only the server side of the MBS broadcast demo is borrowed: the origin and the encoder. That is
-the one dependency this demo has on the MBS repositories.
+The origin is [rt-media-origin](https://github.com/5G-MAG/rt-media-origin), configured from this
+demo's `channels.json`: one process that loops each channel's source file with its own ffmpeg,
+packages it as live DASH and serves it. Nothing from the MBS repositories is used.
 
 ---
 
@@ -57,7 +56,7 @@ the one dependency this demo has on the MBS repositories.
 **Software**
 
 - Node.js 18 or newer, and npm
-- ffmpeg
+- ffmpeg (and ffprobe, which ships with it)
 - python3, curl
 
 **Repositories**, all checked out side by side under `~/Repos`:
@@ -65,12 +64,22 @@ the one dependency this demo has on the MBS repositories.
 ```
 ~/Repos/DVB-I/rt-dvb-i-application-provider    the service list publisher
 ~/Repos/DVB-I/rt-dvb-i-application             the receiver
+~/Repos/DVB-I/rt-dvb-i-service-list-registry   the service list registry
 ~/Repos/DVB-I/rt-dvb-i-examples                this repository
-~/Repos/rt-mbs/rt-mbs-examples                 for the media origin and the live encoder
+~/Repos/rt-media-origin                        the media origin and its live encoders
 ```
 
-A different layout needs `REPOS_ROOT`, `DVBI_ROOT` or `MBS_EXAMPLES_ROOT` changed in `env.sh`.
+A different layout needs `REPOS_ROOT`, `DVBI_ROOT` or `MEDIA_ORIGIN_DIR` changed in `env.sh`.
 Nothing else is derived independently.
+
+`start-all.sh` installs each checkout's npm dependencies when its `node_modules` is missing. In
+`rt-media-origin` it runs `npm ci`, which installs exactly what its `package-lock.json` locks and
+does not rewrite that file. Last run end to end against `rt-media-origin` `main` at `4f408a4`.
+
+**Genre classification schemes.** The registry refuses to start without `GENRE_CS_DIR`, a directory
+holding `ContentCS.xml`, `FormatCS.xml` and `DVBContentSubjectCS-2019.xml` (default
+`~/.local/share/dvb-i-schemas/etsi`). They are never carried in these repositories: the registry's
+README says where each comes from. `start-all.sh` stops before starting anything if one is missing.
 
 **Content.** Your own media, in whatever directory `CONTENT_ROOT` in `env.sh` points at
 (default `~/MWC_TV_RADIO`). The shipped line-up expects:
@@ -93,8 +102,13 @@ cd ~/Repos/DVB-I/rt-dvb-i-examples/scripts/dvbi-live-demo
 ```
 
 The script checks every prerequisite before starting anything, installs npm dependencies in the
-three checkouts if they are missing, then brings up the origin, the encoders, the provider and the
-receiver in that order, waiting at each step until the thing it just started actually answers.
+four checkouts if they are missing, then brings up the origin (which starts one encoder per
+channel), the provider, the registry and the receiver in that order, waiting at each step until
+the thing it just started actually answers.
+
+The provider's own `config.json` and the channel logos in its `public/logos/uploaded/` are
+overwritten by the demo. `start-all.sh` saves them into `run/provider-saved/` first, once, and
+`stop-all.sh` puts them back, contents and modification times.
 
 First run is the slow one: dependencies plus a cold encode. Expect a minute or so. It prints the
 four URLs when everything is up.
@@ -109,33 +123,31 @@ A healthy run:
 
 ```
 processes:
-  UP   encoder-mwc-radio              pid ...
-  UP   encoder-mwc-tv-1               pid ...
-  UP   encoder-mwc-tv-2               pid ...
-  UP   media-server                   pid ...
   UP   rt-dvb-i-application           pid ...
   UP   rt-dvb-i-application-provider  pid ...
+  UP   rt-dvb-i-service-list-registry pid ...
+  UP   rt-media-origin                pid ...
 
 endpoints:
-  media origin   listening  (HTTP 404)  http://127.0.0.1:3004/
+  media origin   listening  (HTTP 200)  http://127.0.0.1:3004/healthz
   provider       listening  (HTTP 200)  http://localhost:4000/service-list.xml
   registry       listening  (HTTP 200)  http://localhost:7000/health
   client         listening  (HTTP 200)  http://localhost:5000/health
 
 channels:
-  tv_1_live    LIVE   last published 2s ago, 30 segments
-  tv_2_live    LIVE   last published 2s ago, 30 segments
-  radio_live   LIVE   last published 3s ago, 30 segments
+  tv_1_live    LIVE   last published 2s ago, 72 segments
+  tv_2_live    LIVE   last published 2s ago, 72 segments
+  tv_3_live    LIVE   last published 2s ago, 72 segments
+  radio_live   LIVE   last published 2s ago, 72 segments
 ```
 
-Two things to read carefully:
+`/healthz` on the origin lists the channel ids it was configured with.
 
-- **`HTTP 404` on the media origin is correct.** It serves static files with directory listing off,
-  so its root has nothing to return. `listening` is the health signal, not the status code.
-- **`LIVE` versus `UP`.** A process can be `UP` while its channel is dead: the last manifest stays
-  on disk and keeps returning 200 after an encoder stops. `LIVE` means the manifest's `publishTime`
-  is recent, so read the channel lines, not the process lines. A `STALE` channel's log is in
-  `run/logs/encoder-<id>.log`.
+**`LIVE` versus `UP`.** A process can be `UP` while a channel is dead: the origin stays up when one
+channel's encoder stops, and the last manifest stays on disk and keeps returning 200. `LIVE` means
+the manifest's `publishTime` is recent, so read the channel lines, not the process lines. Every
+channel's encoder logs into `run/logs/rt-media-origin.log`, each line prefixed with the channel id
+in brackets, for example `[mwc-tv-1]`.
 
 ## 3. Watch it
 
@@ -252,7 +264,7 @@ list and the loadable template are all generated from it, so they cannot disagre
 | Field | What it does |
 |---|---|
 | `source`, `logo` | filenames under `CONTENT_ROOT` |
-| `stream` | the directory the encoder writes, and the path the DVB-I `StreamingInstance` points at |
+| `stream` | the path the origin serves the channel under, and therefore the one the DVB-I `StreamingInstance` points at |
 | `type` | `linear` for TV, `radio` for linear radio (emitted as the `linear-radio` service type) |
 | `genre`, `parentalRating` | service-level classification and minimum age |
 | `languages` | extra service name translations; English is taken from `name` automatically |
@@ -274,9 +286,17 @@ not any wall-clock time.
 | `genre` | falls back to the channel's own genre when absent |
 | `parentalAge` | minimum age for the programme, separate from the service-level rating |
 | `series` | `{title, number, episode}`, emitted as a series group with `MemberOf` so episodes are linked |
-| `catchup` | a catch-up URL, emitted as an on-demand programme alongside the scheduled one |
+| `catchup` | a catch-up URL, emitted as an on-demand programme alongside the scheduled one, but only when a catch-up player is configured (below) |
 
 Programme artwork uses the channel logo, so the demo carries no image files of its own.
+
+**Catch-up needs a catch-up player.** The provider refuses to save a list in which a programme
+carries a catch-up URL while no catch-up player (`catchupPlayer`, its XML AIT) is configured; see
+the provider's README for the fields. A top-level `catchupPlayer` object in `channels.json` is
+written into the provider's `config.json` exactly as given, and nothing in it is defaulted: the
+organisation and application identifiers are the operator's own. Without one there, or already in
+the provider's configuration, the generator leaves every catch-up URL out and names each on stderr,
+so the list still publishes. The shipped `channels.json` has neither catch-up URLs nor a player.
 
 Two fields are deliberately left unset on every demo channel, and the reference service template
 shows them instead:
@@ -290,7 +310,7 @@ After editing:After editing:
 
 ```bash
 ./regen-service-list.sh        # existing channels: regenerates the list and restarts the provider
-./stop-all.sh && ./start-all.sh  # added or removed a channel: an encoder has to start or stop
+./stop-all.sh && ./start-all.sh  # added or removed a channel: the origin's configuration is regenerated
 ```
 
 `regen-service-list.sh` restarts the provider deliberately: it reads `config.json` once at startup,
@@ -303,8 +323,9 @@ list up within its own 30 s poll.
 ./stop-all.sh
 ```
 
-It stops only what `start-all.sh` started. A port still held afterwards is reported, not killed:
-these scripts do not know what else on the machine may be using it.
+It stops only what `start-all.sh` started, waits for the origin's encoders to exit with it, and
+restores the provider's `config.json` and logos saved at start. A port still held afterwards is
+reported, not killed: these scripts do not know what else on the machine may be using it.
 
 ---
 
@@ -314,24 +335,41 @@ these scripts do not know what else on the machine may be using it.
 |---|---|
 | `env.sh` | paths, ports, encoding settings. The only file a different layout needs edited |
 | `channels.json` | the channel line-up, single source of truth |
-| `start-all.sh` | preflight, then origin, encoders, provider, receiver |
+| `start-all.sh` | preflight, then origin, provider, registry, receiver |
 | `status.sh` | what is running, and whether each channel is still publishing |
 | `stop-all.sh` | stops what was started |
 | `regen-service-list.sh` | rebuilds the list from `channels.json` and restarts the provider |
+| `write-origin-config.py` | generates the rt-media-origin configuration, `run/origin/config.json` |
 | `write-service-list.py` | generates the published list, and with `--emit-template` the demo template |
-| `lib.sh` | logging, process and readiness helpers |
-| `run/logs/`, `run/pids/` | per-run state, not tracked |
+| `lib.sh` | logging, process, readiness and provider save/restore helpers |
+| `run/` | per-run state, not tracked: logs, pidfiles, the origin's configuration and media, the saved provider files |
 
 ## What the channels actually are
 
-Genuine live DASH, not files served as video on demand. Each encoder loops its source
+Genuine live DASH, not files served as video on demand. `write-origin-config.py` gives
+rt-media-origin one `live` channel per entry in `channels.json`. The origin loops each source
 indefinitely (`-stream_loop -1`) and writes a rolling window, so every manifest is `type="dynamic"`
 with an advancing `publishTime`, a `timeShiftBufferDepth` and a `minimumUpdatePeriod` equal to the
 segment duration. A receiver joining at any moment joins at the live edge, and the channel never
 ends.
 
-`LIVE_SEG_DURATION` in `env.sh` sets the segment duration and therefore the manifest update period:
-shorter joins closer to the live edge and costs more requests.
+Each channel is one 960x540 H.264 (Main) rendition with AAC audio at 64 kbit/s, the encoding the
+demo used before it moved to rt-media-origin. In `env.sh`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `LIVE_SEG_DURATION` | `4` | segment duration in seconds, and therefore the manifest update period: shorter joins closer to the live edge and costs more requests |
+| `LIVE_WINDOW`, `LIVE_EXTRA_WINDOW` | `24`, `48` | segments the manifest lists, and segments kept on disk beyond those; the origin deletes anything older |
+| `LIVE_VIDEO_BITRATE` | `400k` | video bit rate |
+
+**Radio.** rt-media-origin cannot yet package an audio-only live channel: its `live` mode requires
+a video ladder. The radio channel is therefore served with the video track its own source file
+carries (`RADIO.mp4` has a station picture), as this demo did before. A radio source with no video
+track stops `start-all.sh` with a message naming the channel; leave it out with `DEMO_CHANNELS`.
+The origin never substitutes a test pattern for a missing picture.
+
+The origin also serves its own dashboard at `http://127.0.0.1:3004/dashboard/`, which shows each
+channel's encoder and can stop and start it.
 
 ## Tests
 
@@ -349,7 +387,14 @@ change but not on a no-op republish, which is what tells a receiver to re-read t
 the shape of the generated service, and the schema constraints that have bitten: a `@CGSID` that
 must be an NCName, and a `logoUrl` that must stay relative.
 
-One of them, `TestTemplateDrift`, regenerates the list template from `channels.json` and compares
+The origin configuration has its own cases, which pin what the demo needs from rt-media-origin
+rather than recording past defects: each channel served at the path the service list names,
+looping its source from `CONTENT_ROOT`, the window settings taken from `env.sh`, a radio source
+without video refused. One, `TestOriginConfigAgainstSchema`, runs the configuration generated from
+the shipped `channels.json` through rt-media-origin's own validator, and is skipped when that
+checkout or its dependencies are not there.
+
+Another, `TestTemplateDrift`, regenerates the list template from `channels.json` and compares
 it with the copy in the provider's `templates/`. Regenerating that template is a manual step, so
 this is what notices when it starts describing a line-up that no longer exists. If it fails:
 
@@ -388,10 +433,19 @@ namespaces it emits (`urn:dvb:metadata:servicediscovery:2024`, `urn:dvb:metadata
 **The receiver shows no channels.** Check `http://localhost:4000/service-list.xml` loads directly.
 If it does, the receiver's `/proxy` is refusing it: that endpoint has an SSRF guard that rejects
 loopback addresses, which is exactly where the provider sits here. `start-all.sh` therefore starts
-the receiver with `ALLOW_LOOPBACK_PROXY=1`, the escape hatch its own source documents for local
-testing. Confirm with `grep ALLOW_LOOPBACK run/logs/rt-dvb-i-application.log`, which shows the
-warning it prints when the flag is on. Never set that flag on a deployment reachable from untrusted
-networks: it disables the guard outright.
+the receiver with `PROXY_ALLOW_ORIGINS` naming the provider's and the registry's origins (see
+`env.sh`), and nothing else. Confirm with `grep PROXY_ALLOW run/logs/rt-dvb-i-application.log`
+or the warning listing those origins at the top of that log. `ALLOW_LOOPBACK_PROXY` is no longer
+read by the receiver and is not set.
+
+**"Not over TLS" warnings.** The provider, registry and receiver all run without certificates here,
+so each logs, and the receiver also shows, a warning that ETSI TS 103 770 V1.2.1 clause 7.3
+requires HTTP over TLS, with one exception: "For the specific case that a DVB-I client connects to
+a DVB-I metadata endpoint located on the same private subnet (see clause 3 of IETF RFC 1918 [27]),
+HTTP may be used without TLS." Loopback is not such a subnet. The warning is expected in this demo
+and does not stop anything from loading. `start-all.sh` also passes the provider
+`PLAIN_HTTP=private-subnet` (`ADMIN_PLAIN_HTTP` in `env.sh`): an earlier provider refused to serve
+plain HTTP without it, and the current one reads it as the default.
 
 **"Service list is not valid XML".** The receiver is fetching something that is not the list,
 almost always the provider's home page (`http://localhost:4000/`) rather than the list itself
@@ -411,8 +465,9 @@ localStorage.removeItem('dvbi-url'); location.reload();
 
 **Channels listed but no picture.** Look at the browser console. Segments are fetched straight from
 the origin rather than through the receiver's proxy; the origin sends
-`Access-Control-Allow-Origin: *` and the receiver's CSP allows `http:` media, so a failure here is
-usually the encoder. Run `./status.sh` and look for a `STALE` channel.
+`Access-Control-Allow-Origin: *` (`cors` in its generated configuration) and the receiver's CSP
+allows `http:` media, so a failure here is usually the encoder. Run `./status.sh` and look for a
+`STALE` channel, then at that channel's lines in `run/logs/rt-media-origin.log`.
 
 **A rename in the provider does not reach the receiver.** `ServiceName` in the published list is
 built from the *Multi-language Service Names* entries whenever a service has any, not from the
@@ -430,7 +485,9 @@ cd ~/Repos/DVB-I/rt-dvb-i-application && BROWSER=firefox npm test
 ```
 
 **Port already bound.** Ports are set in `env.sh`. `./stop-all.sh` reports a foreign process holding
-one rather than killing it.
+one rather than killing it. Port 3004 is also the origin port of the MBS demo in rt-mbs-examples;
+with that demo up, move this one's origin: `MEDIA_PORT=3014 ./start-all.sh`, and pass the same
+`MEDIA_PORT` to `status.sh` and `stop-all.sh`. The service list follows it.
 
 **A channel is missing after editing `channels.json`.** `regen-service-list.sh` only republishes the
 list; a new channel also needs its encoder, so use `./stop-all.sh && ./start-all.sh`.

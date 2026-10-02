@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Tests for write-service-list.py.
+"""Tests for write-service-list.py and write-origin-config.py.
 
 Run from this directory:  python3 -m unittest -v test_generator
 
 No dependencies beyond the standard library. Every case here corresponds to something that
 has actually gone wrong, so a failure means a defect that reached a running receiver once
 already, not a hypothetical.
+
+The exceptions are the rt-media-origin configuration (TestOriginConfig,
+TestOriginConfigAgainstSchema) and catch-up (TestCatchup): those cases pin what the demo needs from
+rt-media-origin and from the provider's check on save, not a past defect.
 
 The generator reads its configuration from the environment at import time, so each test
 imports it fresh against a temporary provider directory. Nothing here writes to the real
@@ -24,6 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "write-service-list.py"
+ORIGIN_GENERATOR = HERE / "write-origin-config.py"
 CHANNELS = HERE / "channels.json"
 
 MINIMAL_CONFIG = {
@@ -107,13 +112,13 @@ class GeneratorTestCase(unittest.TestCase):
 
     def run_generator(self):
         """Write the list, and return what landed in config.json."""
-        stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w")
+        stdout, stderr = sys.stdout, sys.stderr
+        sys.stdout = sys.stderr = open(os.devnull, "w")
         try:
             self.gen.main()
         finally:
             sys.stdout.close()
-            sys.stdout = stdout
+            sys.stdout, sys.stderr = stdout, stderr
         return json.loads(self.config_path.read_text())
 
     def set_config(self, cfg):
@@ -208,7 +213,6 @@ class TestProgrammes(GeneratorTestCase):
         self.assertEqual(prog["seriesTitle"], "A Series")
         self.assertEqual(prog["seriesNumber"], 2)
         self.assertEqual(prog["episodeNumber"], 4)
-        self.assertEqual(prog["catchupUrl"], "https://example.com/catchup/1")
 
     def test_programme_genre_falls_back_to_the_channel(self):
         progs = self.run_generator()["services"][0]["epgPrograms"]
@@ -219,6 +223,37 @@ class TestProgrammes(GeneratorTestCase):
         prog = self.run_generator()["services"][0]["epgPrograms"][0]
         self.assertEqual(prog["image"], "http://localhost:4000/logos/uploaded/demo-one.png",
                          "content guide images are emitted verbatim, with no base URL applied")
+
+
+# Opaque to the generator, which writes it as given: the provider is what checks it.
+PLAYER = {"appName": "operator player", "orgId": "<operator's>", "appId": "<operator's>"}
+
+
+class TestCatchup(GeneratorTestCase):
+    """The provider refuses to save a list in which a programme has a catch-up URL and no
+    catch-up player is configured, so a generated list carrying one would not survive the next
+    save in the provider's editor."""
+
+    def test_catchup_left_out_without_a_player(self):
+        cfg = self.run_generator()
+        self.assertIsNone(cfg["services"][0]["epgPrograms"][1]["catchupUrl"])
+        self.assertNotIn("catchupPlayer", cfg)
+
+    def test_player_from_channels_json_is_written_and_catchup_kept(self):
+        channels = copy.deepcopy(ONE_CHANNEL)
+        channels["catchupPlayer"] = PLAYER
+        self.channels_path.write_text(json.dumps(channels))
+        cfg = self.run_generator()
+        self.assertEqual(cfg["catchupPlayer"], PLAYER, "written as given, nothing defaulted")
+        self.assertEqual(cfg["services"][0]["epgPrograms"][1]["catchupUrl"],
+                         "https://example.com/catchup/1")
+
+    def test_player_already_in_the_provider_config_keeps_catchup(self):
+        self.set_config(dict(MINIMAL_CONFIG, catchupPlayer=PLAYER))
+        cfg = self.run_generator()
+        self.assertEqual(cfg["catchupPlayer"], PLAYER, "an operator's own player is not removed")
+        self.assertEqual(cfg["services"][0]["epgPrograms"][1]["catchupUrl"],
+                         "https://example.com/catchup/1")
 
 
 class TestSchemaConstraints(GeneratorTestCase):
@@ -232,6 +267,123 @@ class TestSchemaConstraints(GeneratorTestCase):
     def test_service_uids_are_unique(self):
         uids = [s["uid"] for s in self.run_generator()["services"]]
         self.assertEqual(len(uids), len(set(uids)))
+
+
+def load_origin_generator():
+    spec = importlib.util.spec_from_file_location("dvbi_origin_generator", ORIGIN_GENERATOR)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+ORIGIN_ENV = {
+    "CONTENT_ROOT": "/content",
+    "MEDIA_HOST": "127.0.0.1",
+    "MEDIA_PORT": "3004",
+    "LIVE_SEG_DURATION": "4",
+    "LIVE_WINDOW": "24",
+    "LIVE_EXTRA_WINDOW": "48",
+    "LIVE_VIDEO_BITRATE": "400k",
+    "ORIGIN_OUTPUT_ROOT": "/run/origin/media",
+}
+
+
+def two_channels():
+    one = copy.deepcopy(ONE_CHANNEL["channels"][0])
+    radio = dict(copy.deepcopy(one), id="demo-radio", type="radio", source="RADIO.mp4",
+                 stream="radio_live")
+    return [one, radio]
+
+
+class TestOriginConfig(unittest.TestCase):
+    """The rt-media-origin configuration. Its channel URLs have to be the ones the service list
+    names, or the receiver is sent to manifests that do not exist."""
+
+    def setUp(self):
+        self.gen = load_origin_generator()
+
+    def build(self, channels=None, probe=lambda path: True, **env):
+        return self.gen.origin_config(channels or two_channels(), dict(ORIGIN_ENV, **env), probe)
+
+    def test_one_live_dash_h264_channel_per_entry(self):
+        cfg = self.build()
+        self.assertEqual([c["id"] for c in cfg["channels"]], ["demo-one", "demo-radio"])
+        for ch in cfg["channels"]:
+            self.assertEqual(ch["mode"], "live")
+            self.assertEqual(ch["output"]["format"], "dash")
+            self.assertEqual(ch["output"]["codec"], "h264")
+            self.assertEqual(ch["transport"], "http")
+
+    def test_served_at_the_path_the_service_list_points_at(self):
+        """write-service-list.py points each instance at MEDIA_ORIGIN/<stream>/manifest.mpd, and
+        rt-media-origin serves a channel's output.dir under its mountPath."""
+        ch = self.build()["channels"][0]
+        self.assertEqual(ch["mountPath"], "/one_live")
+        self.assertEqual(ch["output"]["dir"], "/run/origin/media/one_live")
+
+    def test_loops_the_source_from_content_root(self):
+        self.assertEqual(self.build()["channels"][0]["source"], "/content/ONE.mp4")
+
+    def test_segment_duration_and_window_come_from_env(self):
+        out = self.build(LIVE_SEG_DURATION="2", LIVE_WINDOW="10", LIVE_EXTRA_WINDOW="5")["channels"][0]["output"]
+        self.assertEqual((out["segDuration"], out["window"], out["extraWindow"]), (2.0, 10, 5))
+
+    def test_server_binds_the_demo_origin_with_cors(self):
+        server = self.build()["server"]
+        self.assertEqual((server["host"], server["port"]), ("127.0.0.1", 3004))
+        self.assertTrue(server["cors"], "the receiver page fetches segments cross-origin")
+
+    def test_no_rendition_label_is_burnt_into_the_picture(self):
+        self.assertNotIn("label", self.build()["channels"][0]["ladder"][0])
+
+    def test_demo_channels_filters_the_line_up(self):
+        cfg = self.build(DEMO_CHANNELS="demo-radio")
+        self.assertEqual([c["id"] for c in cfg["channels"]], ["demo-radio"])
+
+    def test_radio_with_a_video_track_is_served_with_it(self):
+        cfg = self.build(probe=lambda path: True)
+        self.assertEqual(cfg["channels"][1]["source"], "/content/RADIO.mp4")
+
+    def test_radio_without_video_fails_loudly(self):
+        """rt-media-origin's live mode requires a video ladder, so an audio-only source cannot be
+        served; a test pattern standing in for the missing picture is not an option."""
+        with self.assertRaises(SystemExit) as cm:
+            self.build(probe=lambda path: not path.endswith("RADIO.mp4"))
+        self.assertIn("demo-radio", str(cm.exception))
+
+    def test_duplicate_stream_is_refused(self):
+        a, b = two_channels()
+        b["stream"] = a["stream"]
+        with self.assertRaises(SystemExit):
+            self.build([a, b])
+
+    def test_unsafe_stream_name_is_refused(self):
+        a, _ = two_channels()
+        a["stream"] = "../escape"
+        with self.assertRaises(SystemExit):
+            self.build([a])
+
+
+class TestOriginConfigAgainstSchema(unittest.TestCase):
+    """The configuration generated from the shipped channels.json, validated by rt-media-origin's
+    own schema validator (src/config/schema.js), so a field it would reject at start-up is caught
+    here. Needs the rt-media-origin checkout and its node_modules; skipped without them."""
+
+    def test_shipped_line_up_is_a_valid_rt_media_origin_config(self):
+        clean = {k: v for k, v in os.environ.items() if k not in TestTemplateDrift.LEAKED}
+        out = subprocess.run(["bash", "-c", f'cd "{HERE}" && source env.sh && printf "%s" "$MEDIA_ORIGIN_DIR"'],
+                             capture_output=True, text=True, env=clean)
+        origin_dir = Path(out.stdout.strip())
+        if not (origin_dir / "node_modules" / "ajv").is_dir():
+            self.skipTest(f"no rt-media-origin with dependencies installed at {origin_dir}")
+        channels = json.loads(CHANNELS.read_text())["channels"]
+        cfg = load_origin_generator().origin_config(channels, ORIGIN_ENV, probe=lambda path: True)
+        res = subprocess.run(
+            ["node", "-e", "const {validateConfig} = require(process.argv[1]);"
+                           "validateConfig(JSON.parse(require('fs').readFileSync(0, 'utf8')));",
+             str(origin_dir / "src" / "config" / "schema.js")],
+            input=json.dumps(cfg), capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stderr)
 
 
 class TestTemplateDrift(unittest.TestCase):

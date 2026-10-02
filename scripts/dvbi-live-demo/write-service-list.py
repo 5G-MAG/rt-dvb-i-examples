@@ -17,6 +17,13 @@ Usage:
 The template is built by the same function that builds the published list, so a template
 loaded in the admin cannot drift from what the demo actually broadcasts.
 
+Catch-up: the provider refuses to save a list in which a programme carries a catch-up URL while no
+catch-up player (catchupPlayer in its config.json) is configured, because the on-demand programme
+it implies needs that player's XML AIT. A top-level "catchupPlayer" object in channels.json is
+written into config.json as given; none of its values is defaulted here. Without one, in
+channels.json or already in config.json, every programme's catch-up URL is left out and named on
+stderr, so the list still publishes.
+
 Reads CHANNELS_FILE, ADMIN_DIR, MEDIA_ORIGIN and ADMIN_ORIGIN from the environment (env.sh).
 """
 import json, os, sys
@@ -41,9 +48,10 @@ def languages(c):
     return out
 
 
-def programme(c, p):
+def programme(c, p, catchup=True):
     """One content guide entry. The provider loops a service's programmes to fill its schedule
-    window, so these describe a repeating day rather than a dated one."""
+    window, so these describe a repeating day rather than a dated one. catchup=False leaves out
+    the catch-up URL: see the module docstring."""
     series = p.get("series") or {}
     return {
         "title": p["title"],
@@ -58,13 +66,13 @@ def programme(c, p):
         "seriesTitle": series.get("title"),
         "seriesNumber": series.get("number"),
         "episodeNumber": series.get("episode"),
-        "catchupUrl": p.get("catchup"),
+        "catchupUrl": p.get("catchup") if catchup else None,
     }
 
 
-def service(c):
+def service(c, catchup=True):
     """One DVB-I service, with a single DASH StreamingInstance pointing at the live
-    presentation the encoder for this channel writes."""
+    presentation rt-media-origin serves for this channel."""
     return {
         "id": c["id"],
         "uid": f"tag:5g-mag.org,2026:service:{c['id']}",
@@ -114,7 +122,7 @@ def service(c):
             "url": f"{MEDIA_ORIGIN}/{c['stream']}/manifest.mpd",
             "type": "dash",
         }],
-        "epgPrograms": [programme(c, p) for p in c.get("programmes", [])],
+        "epgPrograms": [programme(c, p, catchup) for p in c.get("programmes", [])],
     }
 
 
@@ -173,18 +181,31 @@ def reconcile_versions(services, existing):
     return services
 
 
+def report_dropped_catchup(channels):
+    for c in channels:
+        for p in c.get("programmes", []):
+            if p.get("catchup"):
+                print(f"  {c['id']}: catch-up URL of \"{p['title']}\" left out, no catchupPlayer is configured",
+                      file=sys.stderr)
+
+
 def main():
     with open(CHANNELS_FILE) as f:
-        channels = json.load(f)["channels"]
+        doc = json.load(f)
+    channels = doc["channels"]
+    player = doc.get("catchupPlayer")
 
-    # Same DEMO_CHANNELS filter the encoders honour (lib.sh, channel_lines). Applied here too so
-    # the published list never offers a service that nothing is encoding.
+    # Same DEMO_CHANNELS filter the origin configuration honours (write-origin-config.py, and
+    # lib.sh's channel_lines). Applied here too so the published list never offers a service that
+    # nothing is encoding.
     only = [x for x in os.environ.get("DEMO_CHANNELS", "").replace(",", " ").split() if x]
     if only:
         channels = [c for c in channels if c["id"] in only]
-    services = [service(c) for c in channels]
 
     if EMIT_TEMPLATE:
+        services = [service(c, catchup=player is not None) for c in channels]
+        if player is None:
+            report_dropped_catchup(channels)
         out = os.path.join(ADMIN_DIR, "templates", "dvbi-local-live-demo.json")
         os.makedirs(os.path.dirname(out), exist_ok=True)
         with open(out, "w") as f:
@@ -197,6 +218,10 @@ def main():
 
     with open(CONFIG) as f:
         cfg = json.load(f)
+    has_player = player is not None or cfg.get("catchupPlayer") is not None
+    services = [service(c, catchup=has_player) for c in channels]
+    if not has_player:
+        report_dropped_catchup(channels)
     reconcile_versions(services, cfg.get("services", []))
     new_values = {
         "listName": LIST_NAME,
@@ -207,6 +232,8 @@ def main():
         "epg": {"id": EPG_ID, "providerName": "5G-MAG"},
         "services": services,
     }
+    if player is not None:
+        new_values["catchupPlayer"] = player
     # ServiceList@version is what tells a running receiver the list has been revised: it re-reads
     # the list only when that number changes, so anything republished under an unchanged version is
     # ignored by every receiver already showing the list. Bump it whenever the generated list

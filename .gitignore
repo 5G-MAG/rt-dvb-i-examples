@@ -1,10 +1,9 @@
-# Per-run state: logs and pidfiles
-scripts/*/run/logs/
-scripts/*/run/pids/
+# Per-run state: logs, pidfiles, the generated media origin configuration and its media output,
+# and stored evidence of a run
+scripts/*/run/
 
-# Per-machine safety copy of the provider's service list, taken by start-all.sh before the demo
-# first replaces it. Machine state, not something to version: a fresh clone has nothing to restore
-# yet, and start-all.sh writes it on first run.
+# Per-machine copy of the provider's service list left by earlier versions of start-all.sh, which
+# now saves it under run/ instead and restores it on stop.
 backups/
 
 node_modules/

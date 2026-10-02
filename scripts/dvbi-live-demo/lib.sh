@@ -54,24 +54,6 @@ wait_http() {  # wait_http <url> <seconds>
     return 1
 }
 
-# Whether a server is listening, regardless of what it answers. The media origin serves static
-# files with directory listing off, so its own root legitimately returns 404: a check that
-# required 2xx there would report a healthy origin as down. Any HTTP response at all proves the
-# server is up, which is what this check is for.
-wait_http_any() {  # wait_http_any <url> <seconds>
-    local i code
-    for ((i = 0; i < $2; i++)); do
-        # curl prints 000 AND exits non-zero when it cannot connect, so a "|| echo 000" fallback
-        # appends a second one and yields "000000", which compares unequal to "000" and made this
-        # check report a dead server as up. Take curl's output as it is and treat empty as 000.
-        code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$1" 2>/dev/null)
-        [[ -z "$code" ]] && code=000
-        [[ "$code" != "000" ]] && return 0
-        sleep 1
-    done
-    return 1
-}
-
 # A live DASH presentation is servable once its manifest both parses as an MPD and names at
 # least one segment. Waiting for the manifest alone is not enough: ffmpeg writes the MPD before
 # the first segment exists, and a receiver that fetches it in that window sees an empty
@@ -84,6 +66,54 @@ wait_presentation() {  # wait_presentation <stream> <seconds>
         sleep 1
     done
     return 1
+}
+
+# The channel ids in channels.json that carry a logo, unfiltered by DEMO_CHANNELS: install_logos
+# copies every one of them into the provider.
+logo_ids() {
+    python3 - "$CHANNELS_FILE" <<'PYEOF'
+import json, sys
+for c in json.load(open(sys.argv[1]))["channels"]:
+    if c.get("logo"): print(c["id"])
+PYEOF
+}
+
+# Saves the provider files this demo overwrites (config.json and the channel logos) into
+# PROVIDER_SAVED_DIR, once: a copy already there is the state from before the first start and is
+# kept, so a second start or a regen-service-list.sh run does not save the demo's own list over it.
+# A file that did not exist is recorded as absent, so that restoring removes it. Written to a
+# temporary directory and renamed into place, so an interrupted save never looks complete.
+save_provider_state() {
+    [[ -d "$PROVIDER_SAVED_DIR" ]] && return 0
+    local tmp="$PROVIDER_SAVED_DIR.tmp" id
+    rm -rf "$tmp"; mkdir -p "$tmp/logos"
+    if [[ -f "$ADMIN_DIR/config.json" ]]; then cp -p "$ADMIN_DIR/config.json" "$tmp/config.json"
+    else touch "$tmp/config.json.absent"; fi
+    while read -r id; do
+        if [[ -f "$ADMIN_DIR/public/logos/uploaded/$id.png" ]]; then
+            cp -p "$ADMIN_DIR/public/logos/uploaded/$id.png" "$tmp/logos/$id.png"
+        else
+            touch "$tmp/logos/$id.png.absent"
+        fi
+    done < <(logo_ids)
+    mv "$tmp" "$PROVIDER_SAVED_DIR"
+    log "saved the provider's config.json and channel logos to $PROVIDER_SAVED_DIR"
+}
+
+# Puts back what save_provider_state saved, contents and modification times, and forgets the copy.
+restore_provider_state() {
+    [[ -d "$PROVIDER_SAVED_DIR" ]] || return 0
+    local f name
+    if [[ -f "$PROVIDER_SAVED_DIR/config.json" ]]; then cp -p "$PROVIDER_SAVED_DIR/config.json" "$ADMIN_DIR/config.json"
+    elif [[ -f "$PROVIDER_SAVED_DIR/config.json.absent" ]]; then rm -f "$ADMIN_DIR/config.json"; fi
+    for f in "$PROVIDER_SAVED_DIR"/logos/*; do
+        [[ -e "$f" ]] || continue
+        name=$(basename "$f")
+        if [[ "$name" == *.absent ]]; then rm -f "$ADMIN_DIR/public/logos/uploaded/${name%.absent}"
+        else cp -p "$f" "$ADMIN_DIR/public/logos/uploaded/$name"; fi
+    done
+    rm -rf "$PROVIDER_SAVED_DIR"
+    log "restored the provider's config.json and channel logos from before the demo"
 }
 
 port_pid() {  # port_pid <port>, prints the pid listening on it, if any

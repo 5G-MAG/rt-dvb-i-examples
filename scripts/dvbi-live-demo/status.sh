@@ -1,9 +1,10 @@
 #!/bin/bash
 # What is running, and whether each channel is actually still live.
 #
-# A process being up does not mean a channel is: an encoder can exit or stall while its last
-# manifest stays on disk and keeps returning 200. The publishTime check below is what
-# distinguishes a live presentation from a stale one, so it is the line to read first.
+# A process being up does not mean a channel is: rt-media-origin can be up while one channel's
+# encoder has exited or stalled, its last manifest still on disk and still returning 200. The
+# publishTime check below is what distinguishes a live presentation from a stale one, so it is
+# the line to read first.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source env.sh
@@ -26,12 +27,12 @@ done
 
 echo
 echo "endpoints:"
-# Any HTTP response means the server is listening. The origin's own root returns 404 by design
-# (static files, directory listing off), so the status code alone is not the health signal here.
-for entry in "media origin|$MEDIA_ORIGIN/" "provider|$ADMIN_ORIGIN/service-list.xml" "registry|$REGISTRY_ORIGIN/health" "client|$CLIENT_ORIGIN/health"; do
+# Any HTTP response means the server is listening.
+for entry in "media origin|$MEDIA_ORIGIN/healthz" "provider|$ADMIN_ORIGIN/service-list.xml" "registry|$REGISTRY_ORIGIN/health" "client|$CLIENT_ORIGIN/health"; do
     IFS='|' read -r label url <<< "$entry"
-    # See the note in lib.sh: a "|| echo 000" fallback here produced "000000" for an unreachable
-    # endpoint, which this then reported as listening.
+    # curl prints 000 AND exits non-zero when it cannot connect, so a "|| echo 000" fallback here
+    # appended a second one and produced "000000" for an unreachable endpoint, which this then
+    # reported as listening. Take curl's output as it is and treat empty as 000.
     code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$url" 2>/dev/null)
     [[ -z "$code" ]] && code=000
     if [[ "$code" == "000" ]]; then
@@ -51,7 +52,7 @@ while IFS='|' read -r id name lcn source stream; do
         continue
     fi
     published=$(grep -oP 'publishTime="\K[^"]+' <<< "$mpd" | head -1)
-    segs=$(ls "$MEDIA_DIR/public/$stream"/chunk-stream0-*.m4s 2>/dev/null | wc -l)
+    segs=$(ls "$ORIGIN_OUTPUT_ROOT/$stream"/chunk-stream0-*.m4s 2>/dev/null | wc -l)
     age=$(( now - $(date -u -d "$published" +%s 2>/dev/null || echo "$now") ))
     # The manifest is rewritten once per segment, so an age well past one segment duration means
     # the encoder is no longer publishing even though the file is still being served.
