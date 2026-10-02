@@ -91,7 +91,7 @@ log "generating its configuration from $(basename "$CHANNELS_FILE")"
 # PORT and HOST are passed as well as written into the configuration: rt-media-origin lets them
 # override the file (src/config/loadConfig.js), so a PORT left in the caller's environment would
 # otherwise move the origin away from the address the service list names.
-run_bg rt-media-origin env RT_MEDIA_SERVER_CONFIG="$ORIGIN_CONFIG" PORT="$MEDIA_PORT" HOST="$MEDIA_HOST" \
+run_bg rt-media-origin env RT_MEDIA_SERVER_CONFIG="$ORIGIN_CONFIG" PORT="$MEDIA_PORT" HOST="$MEDIA_BIND" \
     node "$MEDIA_ORIGIN_DIR/bin/www"
 wait_http "$MEDIA_ORIGIN/healthz" 20 || die "the media origin did not come up, see $LOG_DIR/rt-media-origin.log"
 
@@ -116,7 +116,16 @@ log "=== 3/4 Service List Registry ==="
 # Started before the receiver so discovery can be answered the moment a viewer opens the page.
 # It lists the provider's service list, which is how a client gets from "which lists exist?" to
 # a URL without one being typed in.
-run_bg rt-dvb-i-service-list-registry env PORT="$REGISTRY_PORT" GENRE_CS_DIR="$GENRE_CS_DIR" node "$REGISTRY_DIR/server.js"
+python3 - "$REGISTRY_DIR/registry.json" "$REGISTRY_FILE" "$ADMIN_ORIGIN/service-list.xml" <<'PY'
+import json, sys
+src, out, url = sys.argv[1:4]
+reg = json.load(open(src))
+for p in reg.get("providers", []):
+    for o in p.get("offerings", []):
+        o["uris"] = [url if u.endswith("/service-list.xml") and "localhost" in u else u for u in o.get("uris", [])]
+json.dump(reg, open(out, "w"), indent=2)
+PY
+run_bg rt-dvb-i-service-list-registry env PORT="$REGISTRY_PORT" GENRE_CS_DIR="$GENRE_CS_DIR" REGISTRY_PATH="$REGISTRY_FILE" node "$REGISTRY_DIR/server.js"
 wait_http "$REGISTRY_ORIGIN/health" 20 || die "the registry did not come up, see $LOG_DIR/rt-dvb-i-service-list-registry.log"
 
 log "=== 4/4 DVB-I client ==="

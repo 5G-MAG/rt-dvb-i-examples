@@ -165,6 +165,28 @@ controls act on if a threshold is set; the other two are unrated.
 If it shows no channels, the list is not reaching it. Confirm
 `http://localhost:4000/service-list.xml` loads in a browser tab, then see Troubleshooting.
 
+## 3a. Watch it on a phone over Wi-Fi
+
+Set `DEMO_HOST` to this machine's address on the Wi-Fi network, with the phone on the same network:
+
+```sh
+DEMO_HOST=192.168.1.202 ./start-all.sh      # use this machine's own Wi-Fi address
+DEMO_HOST=192.168.1.202 ./stop-all.sh
+```
+
+The media origin then also listens on the network, and the service list, the logos, the content
+guide endpoints and the registry give out that address instead of `localhost`. On the phone, use
+`http://<DEMO_HOST>:4000/service-list.xml` as the service list, or `http://<DEMO_HOST>:7000` as the
+registry, in the Android DVB-I client (rt-5gms-application, `fivegmag_DVBIClient`) or a browser
+(`http://<DEMO_HOST>:5000/?url=http%3A%2F%2F<DEMO_HOST>%3A4000%2Fservice-list.xml`).
+
+Plain HTTP is used, which ETSI TS 103 770 V1.2.1 clause 7.3 allows on the same private subnet:
+"For the specific case that a DVB-I client connects to a DVB-I metadata endpoint located on the
+same private subnet (see clause 3 of IETF RFC 1918 [27]), HTTP may be used without TLS."
+
+The provider's editor is open to anyone on that network unless `ADMIN_TOKEN` is set: export it
+before `start-all.sh` on a shared network.
+
 ## 4. Use discovery, rather than a URL you typed
 
 The receiver loads a known URL by default, which is convenient but skips the part of DVB-I that

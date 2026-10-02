@@ -44,10 +44,28 @@ CLIENT_PORT="${CLIENT_PORT:-5000}"
 # show discovery rather than starting from a URL somebody typed in.
 REGISTRY_PORT="${REGISTRY_PORT:-7000}"
 
-MEDIA_ORIGIN="http://$MEDIA_HOST:$MEDIA_PORT"
-ADMIN_ORIGIN="http://localhost:$ADMIN_PORT"
-CLIENT_ORIGIN="http://localhost:$CLIENT_PORT"
-REGISTRY_ORIGIN="http://localhost:$REGISTRY_PORT"
+# DEMO_HOST: this machine's address on the local network (for example its Wi-Fi address), for
+# receivers on other devices such as a phone on the same Wi-Fi. When set, the media origin also
+# listens on every interface, and the service list, the logos and the registry give out this address
+# instead of localhost. Leave it empty to keep everything on this machine.
+# Plain HTTP is used either way; ETSI TS 103 770 V1.2.1 clause 7.3: "For the specific case that a
+# DVB-I client connects to a DVB-I metadata endpoint located on the same private subnet (see clause
+# 3 of IETF RFC 1918 [27]), HTTP may be used without TLS." A Wi-Fi address in 192.168.0.0/16,
+# 10.0.0.0/8 or 172.16.0.0/12 with the phone on the same network is that case.
+DEMO_HOST="${DEMO_HOST:-}"
+if [[ -n "$DEMO_HOST" ]]; then
+    MEDIA_BIND="${MEDIA_BIND:-0.0.0.0}"
+    MEDIA_ORIGIN="http://$DEMO_HOST:$MEDIA_PORT"
+    ADMIN_ORIGIN="http://$DEMO_HOST:$ADMIN_PORT"
+    CLIENT_ORIGIN="http://$DEMO_HOST:$CLIENT_PORT"
+    REGISTRY_ORIGIN="http://$DEMO_HOST:$REGISTRY_PORT"
+else
+    MEDIA_BIND="${MEDIA_BIND:-$MEDIA_HOST}"
+    MEDIA_ORIGIN="http://$MEDIA_HOST:$MEDIA_PORT"
+    ADMIN_ORIGIN="http://localhost:$ADMIN_PORT"
+    CLIENT_ORIGIN="http://localhost:$CLIENT_PORT"
+    REGISTRY_ORIGIN="http://localhost:$REGISTRY_PORT"
+fi
 
 # ------------------------------------------------------------------------------------
 # Encoding
@@ -75,6 +93,9 @@ RUN_DIR="$DEMO_ROOT/run"
 LOG_DIR="$RUN_DIR/logs"
 PID_DIR="$RUN_DIR/pids"
 CHANNELS_FILE="${CHANNELS_FILE:-$DEMO_ROOT/channels.json}"
+# The registry's own registry.json lists the provider at localhost; the demo serves a copy with the
+# provider's list at ADMIN_ORIGIN, so a receiver on another device is given a URL it can reach.
+REGISTRY_FILE="$RUN_DIR/registry.json"
 # The generated rt-media-origin configuration, and the directories its channels write into.
 ORIGIN_CONFIG="$RUN_DIR/origin/config.json"
 ORIGIN_OUTPUT_ROOT="$RUN_DIR/origin/media"
@@ -104,6 +125,6 @@ GENRE_CS_DIR="${GENRE_CS_DIR:-$HOME/.local/share/dvb-i-schemas/etsi}"
 # allowlist entry is an origin rather than a host.
 # The registry's origin is named too: the receiver reaches it through the same guarded proxy, so
 # discovery fails with a 400 if it is left out.
-PROXY_ALLOW_ORIGINS="${PROXY_ALLOW_ORIGINS:-http://localhost:$ADMIN_PORT,http://127.0.0.1:$ADMIN_PORT,http://localhost:$REGISTRY_PORT,http://127.0.0.1:$REGISTRY_PORT}"
+PROXY_ALLOW_ORIGINS="${PROXY_ALLOW_ORIGINS:-http://localhost:$ADMIN_PORT,http://127.0.0.1:$ADMIN_PORT,http://localhost:$REGISTRY_PORT,http://127.0.0.1:$REGISTRY_PORT${DEMO_HOST:+,$ADMIN_ORIGIN,$REGISTRY_ORIGIN}}"
 
 set +a
