@@ -74,7 +74,9 @@ Nothing else is derived independently.
 
 `start-all.sh` installs each checkout's npm dependencies when its `node_modules` is missing. In
 `rt-media-origin` it runs `npm ci`, which installs exactly what its `package-lock.json` locks and
-does not rewrite that file. Last run end to end against `rt-media-origin` `main` at `4f408a4`.
+does not rewrite that file. The radio service is served audio only, which needs an rt-media-origin
+with audio-only channels (`audioOnly`, on its `development` branch at the time of writing);
+`start-all.sh` stops with a message if the checkout lacks it.
 
 **Genre classification schemes.** The registry refuses to start without `GENRE_CS_DIR`, a directory
 holding `ContentCS.xml`, `FormatCS.xml` and `DVBContentSubjectCS-2019.xml` (default
@@ -362,11 +364,9 @@ demo used before it moved to rt-media-origin. In `env.sh`:
 | `LIVE_WINDOW`, `LIVE_EXTRA_WINDOW` | `24`, `48` | segments the manifest lists, and segments kept on disk beyond those; the origin deletes anything older |
 | `LIVE_VIDEO_BITRATE` | `400k` | video bit rate |
 
-**Radio.** rt-media-origin cannot yet package an audio-only live channel: its `live` mode requires
-a video ladder. The radio channel is therefore served with the video track its own source file
-carries (`RADIO.mp4` has a station picture), as this demo did before. A radio source with no video
-track stops `start-all.sh` with a message naming the channel; leave it out with `DEMO_CHANNELS`.
-The origin never substitutes a test pattern for a missing picture.
+**Radio.** A `radio` channel is served as an rt-media-origin audio-only channel (`audioOnly: true`):
+the origin takes the source's audio and encodes no video, so the MPD has a single audio
+AdaptationSet whatever the source file carries. A `linear` channel keeps its video ladder.
 
 The origin also serves its own dashboard at `http://127.0.0.1:3004/dashboard/`, which shows each
 channel's encoder and can stop and start it.
@@ -389,8 +389,8 @@ must be an NCName, and a `logoUrl` that must stay relative.
 
 The origin configuration has its own cases, which pin what the demo needs from rt-media-origin
 rather than recording past defects: each channel served at the path the service list names,
-looping its source from `CONTENT_ROOT`, the window settings taken from `env.sh`, a radio source
-without video refused. One, `TestOriginConfigAgainstSchema`, runs the configuration generated from
+looping its source from `CONTENT_ROOT`, the window settings taken from `env.sh`, radio served audio only and
+television with its video ladder. One, `TestOriginConfigAgainstSchema`, runs the configuration generated from
 the shipped `channels.json` through rt-media-origin's own validator, and is skipped when that
 checkout or its dependencies are not there.
 

@@ -32,6 +32,11 @@ preflight() {
         [[ -f "$GENRE_CS_DIR/$f" ]] || die "the registry needs $GENRE_CS_DIR/$f (set GENRE_CS_DIR in env.sh; the scheme files are not bundled, see the demo README)"
     done
     [[ -f "$MEDIA_ORIGIN_DIR/bin/www" ]] || die "rt-media-origin not found at $MEDIA_ORIGIN_DIR (set MEDIA_ORIGIN_DIR in env.sh)"
+    # Radio services are served as audio-only channels, which rt-media-origin accepts only from its
+    # audioOnly support onwards; an older checkout would refuse the generated config at start-up.
+    if grep -q '"type": *"radio"' "$CHANNELS_FILE" && ! grep -q '"audioOnly"' "$MEDIA_ORIGIN_DIR/config/config.schema.json"; then
+        die "rt-media-origin at $MEDIA_ORIGIN_DIR has no audio-only channels, which the radio service needs (use a checkout with audioOnly support, or leave radio out with DEMO_CHANNELS)"
+    fi
     for d in "$ADMIN_DIR" "$CLIENT_DIR" "$REGISTRY_DIR"; do
         [[ -d "$d" ]] || die "not found: $d (check the paths in env.sh)"
     done

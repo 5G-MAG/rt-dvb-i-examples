@@ -312,16 +312,15 @@ class TestOriginConfig(unittest.TestCase):
     def setUp(self):
         self.gen = load_origin_generator()
 
-    def build(self, channels=None, probe=lambda path: True, **env):
-        return self.gen.origin_config(channels or two_channels(), dict(ORIGIN_ENV, **env), probe)
+    def build(self, channels=None, **env):
+        return self.gen.origin_config(channels or two_channels(), dict(ORIGIN_ENV, **env))
 
-    def test_one_live_dash_h264_channel_per_entry(self):
+    def test_one_live_dash_channel_per_entry(self):
         cfg = self.build()
         self.assertEqual([c["id"] for c in cfg["channels"]], ["demo-one", "demo-radio"])
         for ch in cfg["channels"]:
             self.assertEqual(ch["mode"], "live")
             self.assertEqual(ch["output"]["format"], "dash")
-            self.assertEqual(ch["output"]["codec"], "h264")
             self.assertEqual(ch["transport"], "http")
 
     def test_served_at_the_path_the_service_list_points_at(self):
@@ -350,16 +349,19 @@ class TestOriginConfig(unittest.TestCase):
         cfg = self.build(DEMO_CHANNELS="demo-radio")
         self.assertEqual([c["id"] for c in cfg["channels"]], ["demo-radio"])
 
-    def test_radio_with_a_video_track_is_served_with_it(self):
-        cfg = self.build(probe=lambda path: True)
-        self.assertEqual(cfg["channels"][1]["source"], "/content/RADIO.mp4")
+    def test_radio_is_audio_only(self):
+        radio = self.build()["channels"][1]
+        self.assertIs(radio["audioOnly"], True)
+        for key in ("ladder", "fps"):
+            self.assertNotIn(key, radio)
+        self.assertNotIn("codec", radio["output"])
+        self.assertEqual(radio["audio"], {"bitrate": "64k", "sampleRate": 48000})
 
-    def test_radio_without_video_fails_loudly(self):
-        """rt-media-origin's live mode requires a video ladder, so an audio-only source cannot be
-        served; a test pattern standing in for the missing picture is not an option."""
-        with self.assertRaises(SystemExit) as cm:
-            self.build(probe=lambda path: not path.endswith("RADIO.mp4"))
-        self.assertIn("demo-radio", str(cm.exception))
+    def test_television_keeps_its_video_ladder(self):
+        tv = self.build()["channels"][0]
+        self.assertNotIn("audioOnly", tv)
+        self.assertEqual(tv["output"]["codec"], "h264")
+        self.assertEqual(len(tv["ladder"]), 1)
 
     def test_duplicate_stream_is_refused(self):
         a, b = two_channels()
@@ -387,7 +389,7 @@ class TestOriginConfigAgainstSchema(unittest.TestCase):
         if not (origin_dir / "node_modules" / "ajv").is_dir():
             self.skipTest(f"no rt-media-origin with dependencies installed at {origin_dir}")
         channels = json.loads(CHANNELS.read_text())["channels"]
-        cfg = load_origin_generator().origin_config(channels, ORIGIN_ENV, probe=lambda path: True)
+        cfg = load_origin_generator().origin_config(channels, ORIGIN_ENV)
         res = subprocess.run(
             ["node", "-e", "const {validateConfig} = require(process.argv[1]);"
                            "validateConfig(JSON.parse(require('fs').readFileSync(0, 'utf8')));",
