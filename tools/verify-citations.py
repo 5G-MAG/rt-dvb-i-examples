@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# License: 5G-MAG Public License (v1.0)
+# Authors: Jordi J. Gimenez (5G-MAG)
+# Copyright: (C) 2026 5G-MAG Association
+#
+# For full license terms please see the LICENSE file distributed with this
+# program. If this file is missing then the license can be retrieved from
+# https://www.5g-mag.com/license
+
 """Check that every specification citation in these repositories resolves.
 
 Two documents are in play and both number clauses in the same ranges: A184r2 clause 4.8 is

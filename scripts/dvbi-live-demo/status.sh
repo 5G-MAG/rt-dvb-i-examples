@@ -1,4 +1,12 @@
 #!/bin/bash
+# License: 5G-MAG Public License (v1.0)
+# Authors: Jordi J. Gimenez (5G-MAG)
+# Copyright: (C) 2026 5G-MAG Association
+#
+# For full license terms please see the LICENSE file distributed with this
+# program. If this file is missing then the license can be retrieved from
+# https://www.5g-mag.com/license
+
 # What is running, and whether each channel is actually still live.
 #
 # A process being up does not mean a channel is: rt-media-origin can be up while one channel's

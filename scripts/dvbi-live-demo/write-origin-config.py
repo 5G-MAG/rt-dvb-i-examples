@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# License: 5G-MAG Public License (v1.0)
+# Authors: Jordi J. Gimenez (5G-MAG)
+# Copyright: (C) 2026 5G-MAG Association
+#
+# For full license terms please see the LICENSE file distributed with this
+# program. If this file is missing then the license can be retrieved from
+# https://www.5g-mag.com/license
+
 """Generate the rt-media-origin configuration for the demo from channels.json.
 
 One `live` channel per entry: rt-media-origin loops the channel's source file from CONTENT_ROOT

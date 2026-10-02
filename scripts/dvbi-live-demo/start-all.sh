@@ -1,4 +1,12 @@
 #!/bin/bash
+# License: 5G-MAG Public License (v1.0)
+# Authors: Jordi J. Gimenez (5G-MAG)
+# Copyright: (C) 2026 5G-MAG Association
+#
+# For full license terms please see the LICENSE file distributed with this
+# program. If this file is missing then the license can be retrieved from
+# https://www.5g-mag.com/license
+
 # Brings up the DVB-I demo: a local live DASH origin, the DVB-I admin publishing a service list
 # that points at it, and the DVB-I client playing from that list.
 #
