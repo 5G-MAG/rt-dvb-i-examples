@@ -43,7 +43,7 @@ restore_provider_state
 # A port left bound after that means an instance started outside these scripts, by hand or by an
 # earlier session whose pidfiles are gone. Report it rather than killing it: this script does not
 # know what else on this machine may be using that port.
-for port in "$MEDIA_PORT" "$ADMIN_PORT" "$CLIENT_PORT"; do
+for port in "$MEDIA_PORT" "$ADMIN_PORT" "$CLIENT_PORT" "$REGISTRY_PORT"; do
     pid=$(port_pid "$port")
     if [[ -n "$pid" ]]; then
         warn "port $port is still bound by pid $pid, which this demo did not start. Leaving it alone."

@@ -36,6 +36,7 @@ ADMIN_DIR     = os.environ["ADMIN_DIR"]
 MEDIA_ORIGIN  = os.environ["MEDIA_ORIGIN"]
 ADMIN_ORIGIN  = os.environ["ADMIN_ORIGIN"]
 CONFIG        = os.path.join(ADMIN_DIR, "config.json")
+CONFIG_EXAMPLE = os.path.join(ADMIN_DIR, "config.example.json")
 
 
 def languages(c):
@@ -216,7 +217,9 @@ def main():
             print(f"  LCN {s['lcn']}  {s['name']:<12} {s['instances'][0]['url']}")
         return
 
-    with open(CONFIG) as f:
+    # A fresh provider clone has no config.json until its server first starts; the provider then
+    # copies config.example.json, so the generator starts from the same file.
+    with open(CONFIG if os.path.exists(CONFIG) else CONFIG_EXAMPLE) as f:
         cfg = json.load(f)
     has_player = player is not None or cfg.get("catchupPlayer") is not None
     services = [service(c, catchup=has_player) for c in channels]

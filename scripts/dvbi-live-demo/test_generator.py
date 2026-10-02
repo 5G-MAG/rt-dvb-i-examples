@@ -162,6 +162,16 @@ class TestVersions(GeneratorTestCase):
                          "an unchanged list must not bump its version, or every receiver reloads for nothing")
 
 
+class TestFreshProvider(GeneratorTestCase):
+    """A fresh provider clone has config.example.json and no config.json yet."""
+
+    def test_starts_from_config_example(self):
+        self.config_path.unlink()
+        (self.admin / "config.example.json").write_text(json.dumps(MINIMAL_CONFIG))
+        cfg = self.run_generator()
+        self.assertEqual([s["lcn"] for s in cfg["services"]], [c["lcn"] for c in self.channels["channels"]])
+
+
 class TestServiceFields(GeneratorTestCase):
 
     def test_logo_url_is_a_path_not_an_absolute_url(self):
