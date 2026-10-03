@@ -29,7 +29,7 @@
 |  |  |
 |---|---|
 | **Implements** | ETSI TS 103 770 V1.2.1 (2024-09), *Digital Video Broadcasting (DVB); Service Discovery and Programme Metadata for DVB-I* |
-| **Part of** | [DVB-I Services over 5G Systems](https://www.5g-mag.com/reference-tools/dvb-i), alongside [rt-dvb-i-application](https://github.com/5G-MAG/rt-dvb-i-application), [rt-dvb-i-application-provider](https://github.com/5G-MAG/rt-dvb-i-application-provider), [rt-dvb-i-service-list-registry](https://github.com/5G-MAG/rt-dvb-i-service-list-registry) and [rt-5gms-application](https://github.com/5G-MAG/rt-5gms-application) |
+| **Part of** | [DVB-I Services over 5G Systems](https://www.5g-mag.com/reference-tools/dvb-i), alongside [rt-dvb-i-application](https://github.com/5G-MAG/rt-dvb-i-application), [rt-dvb-i-android-application](https://github.com/5G-MAG/rt-dvb-i-android-application), [rt-dvb-i-application-provider](https://github.com/5G-MAG/rt-dvb-i-application-provider), [rt-dvb-i-service-list-registry](https://github.com/5G-MAG/rt-dvb-i-service-list-registry) and [rt-5gms-application](https://github.com/5G-MAG/rt-5gms-application) |
 
 ## Introduction
 
@@ -38,6 +38,8 @@ Runnable example setups for the DVB-I repositories:
 - **`rt-dvb-i-application-provider`** publishes a DVB-I service list (the Application Provider and
   admin portal)
 - **`rt-dvb-i-application`** discovers that list and plays the channels in it (the receiver)
+- **`rt-dvb-i-android-application`** does the same on an Android phone, over the same Wi-Fi (see
+  `scripts/dvbi-live-demo`, section 3a)
 - **`rt-dvb-i-service-list-registry`** tells a receiver which service lists exist (discovery)
 
 Each example brings them up against real content, so they can be exercised end to end without a
