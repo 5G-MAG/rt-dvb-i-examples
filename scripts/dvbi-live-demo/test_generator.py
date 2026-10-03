@@ -180,6 +180,17 @@ class TestFreshProvider(GeneratorTestCase):
         self.assertEqual([s["lcn"] for s in cfg["services"]], [c["lcn"] for c in self.channels["channels"]])
 
 
+class TestListId(GeneratorTestCase):
+    def test_list_id_matches_the_registry_entry(self):
+        registry = Path(__file__).resolve().parents[3] / "rt-dvb-i-service-list-registry" / "registry.json"
+        if not registry.is_file():
+            self.skipTest(f"no registry checkout at {registry}")
+        cfg = self.run_generator()
+        reg = json.loads(registry.read_text())
+        ids = [o["id"] for p in reg["providers"] for o in p["offerings"]]
+        self.assertIn(cfg["listId"], ids)
+
+
 class TestServiceFields(GeneratorTestCase):
 
     def test_logo_url_is_a_path_not_an_absolute_url(self):

@@ -176,7 +176,7 @@ DEMO_HOST=192.168.1.202 ./stop-all.sh
 
 The media origin then also listens on the network, and the service list, the logos, the content
 guide endpoints and the registry give out that address instead of `localhost`. On the phone, use
-`http://<DEMO_HOST>:4000/service-list.xml` as the service list, or `http://<DEMO_HOST>:7000` as the
+`http://<DEMO_HOST>:4000/service-list.xml` as the service list, or `http://<DEMO_HOST>:7000/query` as the
 registry, in the Android DVB-I client (rt-5gms-application, `fivegmag_DVBIClient`) or a browser
 (`http://<DEMO_HOST>:5000/?url=http%3A%2F%2F<DEMO_HOST>%3A4000%2Fservice-list.xml`).
 

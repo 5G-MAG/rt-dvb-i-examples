@@ -136,6 +136,10 @@ def service(c, catchup=True):
 
 
 LIST_NAME = os.environ.get("LIST_NAME", "5G-MAG")
+# ServiceList@id. The demo's registry entry (rt-dvb-i-service-list-registry registry.json) names this
+# list with this ServiceListId, and a client "should" treat a mismatch as an error (TS 103 770 V1.2.1
+# table 12c, @required / ServiceListId), so the two are kept the same.
+LIST_ID = os.environ.get("LIST_ID", "tag:5g-mag.org,2026:servicelist:local-demo")
 EPG_ID    = "local-live-demo-epg"
 
 TEMPLATE_NOTE = [
@@ -236,6 +240,7 @@ def main():
     reconcile_versions(services, cfg.get("services", []))
     new_values = {
         "listName": LIST_NAME,
+        "listId": LIST_ID,
         "providerName": "5G-MAG",
         "listLang": "en",
         # CGSID is typed xs:ID by the DVB-I schema (ContentGuideProviderIdType), so it must be an
