@@ -116,7 +116,7 @@ scheme, host and port: the same host on another port stays blocked.
 
 ## 7. Before exposing either app beyond your machine
 
-Both `DEPLOYMENT.md` files (in each repo) go into detail; the essentials:
+Each repository's README gives its configuration; the essentials:
 
 - **Admin auth**: set `ADMIN_TOKEN` before starting the admin if it will be reachable from anywhere
   but your own laptop:
@@ -124,8 +124,8 @@ Both `DEPLOYMENT.md` files (in each repo) go into detail; the essentials:
   ADMIN_TOKEN="$(openssl rand -hex 24)" npm start
   ```
   The admin UI will prompt for the token once and remember it in `localStorage`.
-- **HTTPS**: per ETSI TS 103 770 §7.3, the service list and EPG endpoints must be served over TLS
-  once the admin and client aren't on the same private subnet. Either set `HTTPS_KEY_PATH` /
+- **HTTPS**: serve the service list and EPG endpoints over TLS once the admin and client aren't on
+  the same private subnet. Either set `HTTPS_KEY_PATH` /
   `HTTPS_CERT_PATH` on both apps, or terminate TLS at a reverse proxy in front of them. Don't run
   plain HTTP outside of local dev.
 - **Logging verbosity**: `LOG_LEVEL=debug|info|warn|error` on either app (default `info`).
@@ -146,8 +146,7 @@ tree and point at them:
 DVBI_SCHEMAS=~/.local/share/dvb-i-schemas/etsi npm test
 ```
 
-Without that the two conformance checks skip cleanly and `npm test` still passes. See
-`COMPLIANCE.md`.
+Without that the two conformance checks skip cleanly and `npm test` still passes.
 
 The receiver's browser tests need a Playwright browser the first time:
 

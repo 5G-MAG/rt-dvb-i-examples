@@ -45,32 +45,16 @@ Runnable example setups for the DVB-I repositories:
 Each example brings them up against real content, so they can be exercised end to end without a
 broadcaster's service list or a public CDN.
 
-### What this reuses, and what it does not
-
 The media origin is [rt-media-origin](https://github.com/5G-MAG/rt-media-origin), configured from
-the demo's `channels.json`. It loops each channel's source with its own ffmpeg, packages it as live
-DASH and serves it.
-
-Nothing from the 5G stack takes part. There is no multicast, no core network, no MBSF or MBSTF, no
-gNB or UE and no MBS client, and none of them needs to be built. What is exercised here is DVB-I
-service discovery and playback over unicast HTTP.
-
-That makes this the DVB-I counterpart to the MBS broadcast tutorial rather than a variant of it.
-The same content can be carried either way, and running both shows the difference.
+the demo's `channels.json`. Delivery is unicast DASH over HTTP; nothing from the 5G stack needs to
+be built.
 
 ## Specification
 
-The demo's service list generator targets **ETSI TS 103 770 V1.2.1 (2024-09)**, a version rather
-than a release name.
+The demo's service list generator targets **ETSI TS 103 770 V1.2.1 (2024-09)**.
 
-Clause-by-clause coverage, and what is still absent, is recorded on the project page rather than
-here: <https://www.5g-mag.com/reference-tools/dvb-i>
-
-**DVB-I over 5G.** What carrying these services over a 5G system would require (what the standards
-already specify, what is still missing from them, and which of the missing pieces these
-repositories could supply) is assessed in `rt-dvb-i-application-provider/DVB-I-OVER-5G.md`. It
-lives there, beside the conformance record it belongs to, rather than being copied here where the
-two would drift apart.
+What the specification defines, and what the DVB-I repositories implement and do not, is on the
+project page: <https://www.5g-mag.com/reference-tools/dvb-i>
 
 ## Install dependencies
 
@@ -191,20 +175,13 @@ no specification text is available to it.
 
 ### Checking citations
 
-Comments across these repositories cite clauses of the DVB-I specification and of its
-implementation guidelines. Both documents number clauses in the same ranges, so a citation naming
-no document is resolved by a reader against whichever they assume. That has produced real errors:
-comments citing implementation guidance for behaviour the specification governs, and clauses that
-turned out to cover something else.
-
 ```bash
 DVBI_SPECS=~/.local/share/dvb-i-specs tools/verify-citations.py
 ```
 
-It checks that every citation names its document and that the clause exists there. Supply the two
-documents yourself as plain text, outside every working tree: no specification text is carried in
-these repositories. Without them the check skips. It cannot tell you whether a clause says what a
-comment claims; only reading does that.
+It checks that every citation in the code names its document and that the clause exists there.
+Supply the documents yourself as plain text, outside every working tree; without them the check
+skips.
 
 ### Layout
 

@@ -12,42 +12,17 @@ built to run it. Nothing leaves the machine: every service binds loopback.
 
 These steps are the whole procedure. Following them from a cold machine reproduces the demo.
 
-## The architecture, and how the pieces fit
+## What runs
 
-DVB-I separates discovery, metadata and media. This demo runs all of it on one machine, so the
-whole chain is visible:
-
-```
-  registry            "which service lists exist for CHE?"
-  :7000        <───────────────────────────────────────────────┐
-    │  returns the provider's service list URL                 │
-    ↓                                                          │
-  provider           service list: which channels exist,       │  receiver
-  :4000        ───── where their media is, what is on ─────►   │  :5000
-    │                content guide: schedule and now/next      │
-    │                                                          │
-  origin             the media itself, DASH segments ──────────┘
-  :3004              rt-media-origin: your files, encoded live on repeat
-```
-
-A receiver with nothing configured asks the **registry** which lists exist. It gets back a URL,
-fetches that **service list** from the provider, and shows the channels. Selecting one plays media
-from the **origin**, while the provider separately answers for the content guide.
-
-| Component | Address | Repository | Role in TS 103 770 clause 4.1 |
-|---|---|---|---|
-| Service List Registry | `localhost:7000` | `rt-dvb-i-service-list-registry` | Service List Registry |
-| Application Provider | `localhost:4000` | `rt-dvb-i-application-provider` | Service List Server and Content Guide Server |
-| Receiver | `localhost:5000` | `rt-dvb-i-application` | DVB-I client |
-| Media origin | `127.0.0.1:3004` | `rt-media-origin` | MPD server |
-| Live encoder, one per channel | run by the origin | `rt-media-origin` (one ffmpeg per channel) | not a DVB-I component; it produces the content |
-
-The registry's port is 7000 rather than 6000 because 6000 is on the WHATWG blocked-ports list: a
-browser refuses to fetch from it, and so does Node.
+| Component | Address | Repository |
+|---|---|---|
+| Service List Registry | `localhost:7000` | `rt-dvb-i-service-list-registry` |
+| Application Provider | `localhost:4000` | `rt-dvb-i-application-provider` |
+| Receiver | `localhost:5000` | `rt-dvb-i-application` |
+| Media origin, with one live encoder per channel | `127.0.0.1:3004` | `rt-media-origin` |
 
 The origin is [rt-media-origin](https://github.com/5G-MAG/rt-media-origin), configured from this
-demo's `channels.json`: one process that loops each channel's source file with its own ffmpeg,
-packages it as live DASH and serves it. Nothing from the MBS repositories is used.
+demo's `channels.json`.
 
 ---
 
@@ -180,9 +155,7 @@ guide endpoints and the registry give out that address instead of `localhost`. O
 registry, in the DVB-I Android Application ([rt-dvb-i-android-application](https://github.com/5G-MAG/rt-dvb-i-android-application)) or a browser
 (`http://<DEMO_HOST>:5000/?url=http%3A%2F%2F<DEMO_HOST>%3A4000%2Fservice-list.xml`).
 
-Plain HTTP is used, which ETSI TS 103 770 V1.2.1 clause 7.3 allows on the same private subnet:
-"For the specific case that a DVB-I client connects to a DVB-I metadata endpoint located on the
-same private subnet (see clause 3 of IETF RFC 1918 [27]), HTTP may be used without TLS."
+Plain HTTP is used, which is meant only for a private subnet shared with the phone.
 
 The provider's editor is open to anyone on that network unless `ADMIN_TOKEN` is set: export it
 before `start-all.sh` on a shared network.
@@ -368,17 +341,9 @@ reported, not killed: these scripts do not know what else on the machine may be 
 | `lib.sh` | logging, process, readiness and provider save/restore helpers |
 | `run/` | per-run state, not tracked: logs, pidfiles, the origin's configuration and media, the saved provider files |
 
-## What the channels actually are
+## Encoder settings
 
-Genuine live DASH, not files served as video on demand. `write-origin-config.py` gives
-rt-media-origin one `live` channel per entry in `channels.json`. The origin loops each source
-indefinitely (`-stream_loop -1`) and writes a rolling window, so every manifest is `type="dynamic"`
-with an advancing `publishTime`, a `timeShiftBufferDepth` and a `minimumUpdatePeriod` equal to the
-segment duration. A receiver joining at any moment joins at the live edge, and the channel never
-ends.
-
-Each channel is one 960x540 H.264 (Main) rendition with AAC audio at 64 kbit/s, the encoding the
-demo used before it moved to rt-media-origin. In `env.sh`:
+Each channel is served as live DASH by rt-media-origin, looping its source file. In `env.sh`:
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -386,12 +351,8 @@ demo used before it moved to rt-media-origin. In `env.sh`:
 | `LIVE_WINDOW`, `LIVE_EXTRA_WINDOW` | `24`, `48` | segments the manifest lists, and segments kept on disk beyond those; the origin deletes anything older |
 | `LIVE_VIDEO_BITRATE` | `400k` | video bit rate |
 
-**Radio.** A `radio` channel is served as an rt-media-origin audio-only channel (`audioOnly: true`):
-the origin takes the source's audio and encodes no video, so the MPD has a single audio
-AdaptationSet whatever the source file carries. A `linear` channel keeps its video ladder.
-
-The origin also serves its own dashboard at `http://127.0.0.1:3004/dashboard/`, which shows each
-channel's encoder and can stop and start it.
+A `radio` channel is served audio only. The origin also serves its own dashboard at
+`http://127.0.0.1:3004/dashboard/`, which shows each channel's encoder and can stop and start it.
 
 ## Tests
 
@@ -402,53 +363,22 @@ cd ~/Repos/DVB-I/rt-dvb-i-examples/scripts/dvbi-live-demo
 python3 -m unittest -v test_generator
 ```
 
-Every case corresponds to something that has actually gone wrong, so a failure is a defect that
-reached a running receiver once already. They cover the two version rules (a changed service moves
-forward from what was published rather than resetting, and `ServiceList@version` bumps on a real
-change but not on a no-op republish, which is what tells a receiver to re-read the list at all),
-the shape of the generated service, and the schema constraints that have bitten: a `@CGSID` that
-must be an NCName, and a `logoUrl` that must stay relative.
-
-The origin configuration has its own cases, which pin what the demo needs from rt-media-origin
-rather than recording past defects: each channel served at the path the service list names,
-looping its source from `CONTENT_ROOT`, the window settings taken from `env.sh`, radio served audio only and
-television with its video ladder. One, `TestOriginConfigAgainstSchema`, runs the configuration generated from
-the shipped `channels.json` through rt-media-origin's own validator, and is skipped when that
-checkout or its dependencies are not there.
-
-Another, `TestTemplateDrift`, regenerates the list template from `channels.json` and compares
-it with the copy in the provider's `templates/`. Regenerating that template is a manual step, so
-this is what notices when it starts describing a line-up that no longer exists. If it fails:
+`TestOriginConfigAgainstSchema` is skipped when the rt-media-origin checkout or its dependencies are
+not there. If `TestTemplateDrift` fails, regenerate the provider's list template:
 
 ```bash
 source ./env.sh && ./write-service-list.py --emit-template
 ```
 
-## Conformance
+## Validating the published list
 
-The published list and the demo template are both validated against the real DVB-I and TV-Anytime
-schemas by the provider's own conformance test:
+The published list and the demo template are validated by the provider's own tests, with the DVB-I
+and TV-Anytime schemas you supply from outside every working tree:
 
 ```bash
 cd ~/Repos/DVB-I/rt-dvb-i-application-provider
 DVBI_SCHEMAS=~/.local/share/dvb-i-schemas/etsi npm test
 ```
-
-That runs three checks: unit tests, XSD validation, and classification scheme membership. The last
-one matters because CS references are typed `anyURI`, so a schema-valid list can still name a term
-that does not exist; it checks each emitted term against the scheme files, which ship in the same
-archive as the schemas.
-
-That test is bring-your-own-schema and skips cleanly without one, so no schema file is ever carried
-in these repositories. The authoritative copies ship with the specification itself, in the
-electronic attachment archive that accompanies ETSI TS 103 770 (annex B lists its contents); keep
-them somewhere outside every working tree, as above. With them present the test validates the
-sample list, the live `config.json`, every file in `templates/`, and both EPG endpoints, and prints
-which schema files it used.
-
-The generator targets **ETSI TS 103 770 V1.2.1 (2024-09)**, which is the issue matching the
-namespaces it emits (`urn:dvb:metadata:servicediscovery:2024`, `urn:dvb:metadata:servicediscovery-types:2023`,
-`urn:tva:metadata:2024`). See the provider's `COMPLIANCE.md` for what is and is not covered.
 
 ## Troubleshooting
 
@@ -461,11 +391,8 @@ or the warning listing those origins at the top of that log. `ALLOW_LOOPBACK_PRO
 read by the receiver and is not set.
 
 **"Not over TLS" warnings.** The provider, registry and receiver all run without certificates here,
-so each logs, and the receiver also shows, a warning that ETSI TS 103 770 V1.2.1 clause 7.3
-requires HTTP over TLS, with one exception: "For the specific case that a DVB-I client connects to
-a DVB-I metadata endpoint located on the same private subnet (see clause 3 of IETF RFC 1918 [27]),
-HTTP may be used without TLS." Loopback is not such a subnet. The warning is expected in this demo
-and does not stop anything from loading. `start-all.sh` also passes the provider
+so each logs, and the receiver also shows, a warning that the metadata is not served over TLS. The
+warning is expected in this demo and does not stop anything from loading. `start-all.sh` also passes the provider
 `PLAIN_HTTP=private-subnet` (`ADMIN_PLAIN_HTTP` in `env.sh`): an earlier provider refused to serve
 plain HTTP without it, and the current one reads it as the default.
 
